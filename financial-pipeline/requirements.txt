@@ -1,0 +1,12 @@
+yfinance
+pandas
+numpy
+matplotlib
+seaborn
+mplfinance
+fpdf2
+openpyxl
+python-dotenv
+APScheduler
+pytest
+tabulate
