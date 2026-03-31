@@ -7,9 +7,8 @@ import pandas as pd
 
 import cleaner
 import db
-import explorer
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -29,6 +28,7 @@ def _load_prices(config: dict) -> pd.DataFrame:
 
 
 def _load_info(symbol: str) -> dict:
+    """Load the raw info JSON for a symbol, returning an empty dict if absent."""
     path = Path(f"data/raw/{symbol}_info.json")
     if path.exists():
         with open(path) as f:
@@ -38,6 +38,7 @@ def _load_info(symbol: str) -> dict:
 
 
 def _compute_summary_stats(df: pd.DataFrame) -> dict:
+    """Compute key performance metrics from a cleaned price DataFrame."""
     close = df["close"] if "close" in df.columns else df["Close"]
     daily_ret = df["daily_return"] if "daily_return" in df.columns else df.get("daily_return")
     volume = df["volume"] if "volume" in df.columns else df.get("Volume")
@@ -81,6 +82,7 @@ def _compute_summary_stats(df: pd.DataFrame) -> dict:
 
 
 def _compute_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a DataFrame of close price and 20/50/200-day simple moving averages."""
     close = df["close"] if "close" in df.columns else df["Close"]
     n = len(df)
     result = pd.DataFrame({"close": close}, index=df.index)
@@ -91,6 +93,7 @@ def _compute_moving_averages(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _compute_monthly_returns(df: pd.DataFrame) -> pd.DataFrame:
+    """Return a pivot table of mean daily returns grouped by year and month."""
     daily_ret = df["daily_return"] if "daily_return" in df.columns else df.get("daily_return")
     tmp = daily_ret.copy().to_frame("daily_return")
     tmp["year"] = df.index.year
@@ -101,6 +104,7 @@ def _compute_monthly_returns(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def _compute_drawdown_series(df: pd.DataFrame) -> pd.Series:
+    """Return a Series of rolling drawdown (%) from the running peak close price."""
     close = df["close"] if "close" in df.columns else df["Close"]
     rolling_max = close.cummax()
     return ((close - rolling_max) / rolling_max * 100).rename("drawdown_pct")
@@ -160,6 +164,7 @@ def run_analysis(config: dict) -> dict:
 
 
 if __name__ == "__main__":
+    import explorer
     import fetcher
 
     config = explorer.interactive_select()

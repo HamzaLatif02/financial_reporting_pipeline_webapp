@@ -7,13 +7,14 @@ from pathlib import Path
 
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 DB_PATH = Path("data/reporting.db")
 
 
 def _connect() -> sqlite3.Connection:
+    """Open and return a connection to the SQLite database."""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     return sqlite3.connect(DB_PATH)
 
@@ -25,6 +26,7 @@ def _table_name(symbol: str) -> str:
 
 
 def _now() -> str:
+    """Return the current UTC time as an ISO-8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 

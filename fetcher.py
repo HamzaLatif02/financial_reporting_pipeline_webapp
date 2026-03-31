@@ -5,9 +5,7 @@ from pathlib import Path
 import pandas as pd
 import yfinance as yf
 
-import explorer
-
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 RAW_DIR = Path("data/raw")
@@ -91,6 +89,7 @@ def load_raw(symbol: str) -> dict:
 
 
 if __name__ == "__main__":
+    import explorer
     config = explorer.interactive_select()
     result = fetch_data(config)
 

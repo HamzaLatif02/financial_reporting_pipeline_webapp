@@ -3,10 +3,9 @@ from pathlib import Path
 
 import pandas as pd
 
-import explorer
 import fetcher
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 CLEAN_DIR = Path("data/clean")
@@ -78,6 +77,7 @@ def load_clean(symbol: str) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    import explorer
     config = explorer.interactive_select()
     fetcher.fetch_data(config)
     df = clean_data(config)

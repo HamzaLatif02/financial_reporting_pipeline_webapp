@@ -6,16 +6,12 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import mplfinance as mpf
-import numpy as np
 import pandas as pd
 import seaborn as sns
 
 import analysis as ana
-import cleaner
-import explorer
-import fetcher
 
-logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(levelname)s — %(message)s")
 logger = logging.getLogger(__name__)
 
 CHARTS_DIR = Path("data/charts")
@@ -28,11 +24,13 @@ sns.set_theme(style="whitegrid")
 
 
 def _out(symbol: str, name: str) -> Path:
+    """Return the output path for a chart PNG, creating the directory if needed."""
     CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     return CHARTS_DIR / f"{symbol}_{name}.png"
 
 
 def _save(fig, path: Path) -> str:
+    """Save a matplotlib figure to disk, close it, and return the path string."""
     fig.savefig(path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
     logger.info("Saved %s", path)
@@ -64,7 +62,7 @@ def _candlestick(config: dict, analysis: dict) -> str:
     mc = mpf.make_marketcolors(up=POS_GREEN, down=NEGATIVE, inherit=True)
     style = mpf.make_mpf_style(base_mpf_style="default", marketcolors=mc)
 
-    fig, axes = mpf.plot(
+    fig, _ = mpf.plot(
         df,
         type="candle",
         volume=has_volume,
@@ -313,6 +311,9 @@ def generate_charts(config: dict, analysis: dict) -> list:
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    import cleaner
+    import explorer
+    import fetcher
     config = explorer.interactive_select()
     fetcher.fetch_data(config)
     cleaner.clean_data(config)

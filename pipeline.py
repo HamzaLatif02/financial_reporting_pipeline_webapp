@@ -10,8 +10,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
 
 import analysis as ana
 import charts as ch
@@ -43,10 +44,12 @@ CONFIG_DIR = Path("data")
 
 
 def _config_path(symbol: str) -> Path:
+    """Return the path to the saved config JSON for a symbol."""
     return CONFIG_DIR / f"{symbol}_config.json"
 
 
 def _save_config(config: dict) -> None:
+    """Persist the pipeline config dict to data/{symbol}_config.json."""
     path = _config_path(config["symbol"])
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
@@ -57,6 +60,7 @@ def _save_config(config: dict) -> None:
 # ── Email ─────────────────────────────────────────────────────────────────────
 
 def _smtp_settings() -> dict:
+    """Load and return SMTP connection settings from environment variables."""
     load_dotenv()
     return {
         "host":      os.getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -69,8 +73,7 @@ def _smtp_settings() -> dict:
 
 def _credentials_configured(smtp: dict) -> bool:
     """Return True only if all SMTP fields are set and not placeholder values."""
-    placeholders = {"", "your_email@gmail.com", "your_app_password",
-                    "your_email@gmail.com"}
+    placeholders = {"", "your_email@gmail.com", "your_app_password"}
     for field in ("user", "password", "recipient"):
         val = smtp.get(field, "")
         if not val or val in placeholders or val.startswith("your_"):
@@ -79,6 +82,7 @@ def _credentials_configured(smtp: dict) -> bool:
 
 
 def _send_email(subject: str, body: str, attachment_path: str = None) -> None:
+    """Send an email with an optional PDF attachment via SMTP/TLS."""
     smtp = _smtp_settings()
     if not _credentials_configured(smtp):
         logger.warning(
@@ -115,6 +119,7 @@ def _send_email(subject: str, body: str, attachment_path: str = None) -> None:
 
 
 def _build_stats_body(config: dict, analysis: dict) -> str:
+    """Format summary_stats as a plain-text email body."""
     stats = analysis.get("summary_stats") or {}
     lines = [
         f"Financial Report — {config['name']} ({config['symbol']})",
@@ -159,6 +164,7 @@ def _build_stats_body(config: dict, analysis: dict) -> str:
 
 
 def _send_failure_alert(stage: str, symbol: str, tb: str) -> None:
+    """Send a plain-text failure alert email with the traceback."""
     subject = f"Pipeline FAILED — {symbol} at stage: {stage}"
     body = f"The pipeline failed at stage '{stage}' for {symbol}.\n\n{tb}"
     try:
