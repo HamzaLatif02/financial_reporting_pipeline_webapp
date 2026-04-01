@@ -16,3 +16,4 @@ frontend/build/
 __pycache__/
 backend/__pycache__/
 backend/data/
+ENV_VARS.md
