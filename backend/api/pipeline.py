@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -20,11 +21,14 @@ from analysis import run_analysis
 from charts import generate_charts
 from report import generate_report
 from scheduler import _send_email  # reuse the shared email helper
+from extensions import limiter
 
 pipeline_bp = Blueprint("pipeline", __name__)
 logger = logging.getLogger(__name__)
 
-_REQUIRED_FIELDS = {"symbol", "name", "asset_type", "currency", "period", "interval"}
+_REQUIRED_FIELDS  = {"symbol", "name", "asset_type", "currency", "period", "interval"}
+_SYMBOL_RE        = re.compile(r'^[A-Z0-9.\-\^=]{1,20}$')
+_ALLOWED_EMAIL    = os.getenv("REPORT_RECIPIENT", "").strip().lower()
 
 # Fields surfaced from the raw Yahoo Finance info blob
 _INFO_FIELDS = (
@@ -53,6 +57,7 @@ def _chart_urls(paths: list, symbol: str) -> list:
 
 
 @pipeline_bp.post("/run")
+@limiter.limit("5 per hour")
 def run_pipeline():
     body = request.get_json(silent=True) or {}
 
@@ -64,8 +69,22 @@ def run_pipeline():
         }), 400
 
     config = {field: body[field] for field in _REQUIRED_FIELDS}
-    symbol = config["symbol"]
-    email  = (body.get("email") or "").strip() or None
+    symbol = config["symbol"].strip().upper()
+    config["symbol"] = symbol
+
+    if not _SYMBOL_RE.match(symbol):
+        return jsonify({
+            "status": "error",
+            "error":  "Invalid symbol. Use 1–20 characters: letters, digits, . - ^ =",
+        }), 400
+
+    raw_email = (body.get("email") or "").strip().lower()
+    if raw_email and (_ALLOWED_EMAIL and raw_email != _ALLOWED_EMAIL):
+        return jsonify({
+            "status": "error",
+            "error":  "Email address not permitted.",
+        }), 403
+    email = raw_email or None
 
     # ------------------------------------------------------------------ #
     # Stage 1 — init_db                                                    #

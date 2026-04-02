@@ -11,6 +11,7 @@ from api.assets   import assets_bp
 from api.pipeline import pipeline_bp
 from api.reports  import reports_bp
 from api.schedule import schedule_bp
+from extensions   import limiter
 
 load_dotenv()
 
@@ -28,6 +29,8 @@ else:
     app = Flask(__name__)
     CORS(app)
     logger.info("Development mode — CORS enabled, React served by Vite")
+
+limiter.init_app(app)
 
 app.register_blueprint(assets_bp,   url_prefix="/api/assets")
 app.register_blueprint(pipeline_bp, url_prefix="/api/pipeline")
