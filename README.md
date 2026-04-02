@@ -8,13 +8,31 @@ Built with Flask and React. Developed with [Claude Code](https://claude.ai/code)
 
 ## Live Demo
 
-[Live Demo]([https://your-app.onrender.com](https://financial-pipeline-webapp.onrender.com/))
+[Live Demo](https://financial-pipeline-webapp.onrender.com/)
 
 ---
 
 ## Screenshots
 
-> Add screenshots here
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f2944ffe-4788-4ec2-ba18-b07f136c9402"" width="1200"/>
+</p>
+<p align="center"><i>Figure 1: Parameters selection for analysis.</i></p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/15d975f6-ec79-467a-96c4-a895acaf2010" width="1200"/>
+</p>
+<p align="center"><i>Figure 2: Analysis results.</i></p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/03146ae0-2b0b-49c8-a262-c0778ded97d8" width="1200"/>
+</p>
+<p align="center"><i>Figure 3: Schedule report menu.</i></p>
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/efaa8aca-cfef-4666-a748-c56811d03fe9" width="1300"/>
+</p>
+<p align="center"><i>Figure 4: PDF Report sample.</i></p>
 
 ---
 
