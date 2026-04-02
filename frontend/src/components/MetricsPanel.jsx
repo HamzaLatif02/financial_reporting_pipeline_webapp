@@ -88,7 +88,7 @@ export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol
       </div>
 
       {/* ── Metric cards ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {METRIC_KEYS.map(key => (
           <MetricCard key={key} metricKey={key} value={summaryStats[key] ?? null} />
         ))}

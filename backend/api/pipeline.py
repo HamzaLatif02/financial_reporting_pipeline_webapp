@@ -18,6 +18,7 @@ from cleaner import clean_data
 from db import insert_prices, insert_info, init_db, list_assets
 from analysis import run_analysis
 from charts import generate_charts
+from report import generate_report
 
 pipeline_bp = Blueprint("pipeline", __name__)
 logger = logging.getLogger(__name__)
@@ -122,7 +123,16 @@ def run_pipeline():
         return jsonify({"status": "error", "stage": "generate_charts", "error": str(exc)}), 500
 
     # ------------------------------------------------------------------ #
-    # Stage 7 — save config                                                #
+    # Stage 7 — generate PDF report                                        #
+    # ------------------------------------------------------------------ #
+    try:
+        generate_report(config, analysis, chart_paths)
+    except Exception as exc:
+        logger.exception("generate_report failed for %s", symbol)
+        return jsonify({"status": "error", "stage": "generate_report", "error": str(exc)}), 500
+
+    # ------------------------------------------------------------------ #
+    # Stage 8 — save config                                                #
     # ------------------------------------------------------------------ #
     try:
         config_path = Path(_ROOT) / "data" / f"{symbol}_config.json"
