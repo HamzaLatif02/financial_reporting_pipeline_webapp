@@ -89,9 +89,16 @@ export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol
 
       {/* ── Metric cards ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
-        {METRIC_KEYS.map(key => (
-          <MetricCard key={key} metricKey={key} value={summaryStats[key] ?? null} />
-        ))}
+        {METRIC_KEYS.map(key => {
+          const value = summaryStats[key] ?? null
+          const formatted = fmt(value, key)
+          const wide = key === 'avg_daily_volume' && formatted.length > 11
+          return (
+            <div key={key} className={wide ? 'col-span-2' : ''}>
+              <MetricCard metricKey={key} value={value} />
+            </div>
+          )
+        })}
       </div>
 
       {/* ── Asset info ─────────────────────────────────────────────────── */}
