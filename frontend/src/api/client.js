@@ -30,7 +30,12 @@ export async function validateTicker(symbol) {
 
 export async function runPipeline(config) {
   const res = await http.post('/pipeline/run', config)
-  return unwrap(res)
+  const data = res.data
+  if (data?.status === 'error') {
+    const msg = data.stage ? `[${data.stage}] ${data.error}` : data.error
+    throw new Error(msg)
+  }
+  return data
 }
 
 export async function getPreviousRuns() {

@@ -114,7 +114,14 @@ export default function Dashboard({ result, onReset }) {
             </div>
           )}
           {reports && (
-            <ChartViewer symbol={symbol} charts={reports.charts} />
+            reports.charts.length === 0
+              ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 py-12
+                                text-center text-sm text-slate-500">
+                  Charts are still generating — refresh in a moment.
+                </div>
+              )
+              : <ChartViewer symbol={symbol} charts={reports.charts} />
           )}
         </div>
       </div>

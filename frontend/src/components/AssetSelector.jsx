@@ -21,7 +21,9 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
   // ── Load reference data ──────────────────────────────────────────────────
 
-  useEffect(() => {
+  function loadData() {
+    setFetching(true)
+    setFetchError(null)
     Promise.all([getCategories(), getPeriods(), getIntervals()])
       .then(([cats, per, inv]) => {
         setCategories(cats)
@@ -31,7 +33,9 @@ export default function AssetSelector({ onSubmit, isLoading }) {
       })
       .catch(err => setFetchError(err.message))
       .finally(() => setFetching(false))
-  }, [])
+  }
+
+  useEffect(() => { loadData() }, [])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
@@ -95,8 +99,15 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
   if (fetchError) {
     return (
-      <div className="rounded-lg bg-red-50 border border-red-200 text-red-700 px-5 py-4 text-sm">
-        Failed to load asset data: {fetchError}
+      <div className="flex flex-col items-center gap-4 py-12 text-center">
+        <p className="text-sm text-red-600">Failed to load asset data: {fetchError}</p>
+        <button
+          onClick={loadData}
+          className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium
+                     hover:bg-slate-700 transition-colors"
+        >
+          Retry
+        </button>
       </div>
     )
   }

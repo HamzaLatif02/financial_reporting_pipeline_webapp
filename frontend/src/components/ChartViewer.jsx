@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, ImageOff } from 'lucide-react'
 import { getChartUrl } from '../api/client'
 
 const LABEL_MAP = {
@@ -27,9 +27,21 @@ function labelFromStem(stem) {
     .join(' ')
 }
 
-function ChartImage({ filename }) {
-  const [loaded, setLoaded] = useState(false)
+function ChartImage({ filename, label }) {
+  const [loaded,   setLoaded]   = useState(false)
+  const [errored,  setErrored]  = useState(false)
   const url = getChartUrl(filename)
+
+  if (errored) {
+    return (
+      <div className="rounded-xl border border-slate-200 bg-slate-50 py-16
+                      flex flex-col items-center gap-2 text-sm text-slate-400">
+        <ImageOff size={28} className="text-slate-300" />
+        <p className="font-medium text-slate-500">{label}</p>
+        <p>Chart unavailable</p>
+      </div>
+    )
+  }
 
   return (
     <div className="relative w-full">
@@ -41,6 +53,7 @@ function ChartImage({ filename }) {
         src={url}
         alt={filename}
         onLoad={() => setLoaded(true)}
+        onError={() => setErrored(true)}
         className={`w-full rounded-xl border border-slate-200 transition-opacity duration-300 ${
           loaded ? 'opacity-100' : 'opacity-0'
         }`}
@@ -90,7 +103,11 @@ export default function ChartViewer({ symbol, charts = [] }) {
       </div>
 
       {/* ── Chart image ────────────────────────────────────────────────── */}
-      <ChartImage key={activeFilename} filename={activeFilename} />
+      <ChartImage
+        key={activeFilename}
+        filename={activeFilename}
+        label={labelFromStem(stemFromFilename(activeFilename, symbol))}
+      />
 
       {/* ── Open full size link ────────────────────────────────────────── */}
       <div className="flex justify-end">

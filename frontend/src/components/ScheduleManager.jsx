@@ -8,12 +8,16 @@ export default function ScheduleManager({ onClose }) {
   const [error,   setError]   = useState(null)
   const [removing, setRemoving] = useState(null) // job_id being removed
 
-  useEffect(() => {
+  function load() {
+    setLoading(true)
+    setError(null)
     listSchedules()
       .then(setJobs)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
-  }, [])
+  }
+
+  useEffect(() => { load() }, [])
 
   async function handleRemove(job) {
     if (!window.confirm(`Cancel the scheduled report for ${job.symbol}? This cannot be undone.`)) return
@@ -63,7 +67,16 @@ export default function ScheduleManager({ onClose }) {
           )}
 
           {error && (
-            <p className="text-sm text-red-600 py-4">{error}</p>
+            <div className="py-8 text-center space-y-3">
+              <p className="text-sm text-red-600">{error}</p>
+              <button
+                onClick={load}
+                className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium
+                           hover:bg-slate-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
           )}
 
           {!loading && !error && jobs?.length === 0 && (
