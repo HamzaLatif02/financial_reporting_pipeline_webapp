@@ -8,7 +8,7 @@ Built with Flask and React. Developed with [Claude Code](https://claude.ai/code)
 
 ## Live Demo
 
-[Live Demo](https://your-app.onrender.com)
+[Live Demo]([https://your-app.onrender.com](https://financial-pipeline-webapp.onrender.com/))
 
 ---
 
