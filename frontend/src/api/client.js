@@ -50,3 +50,18 @@ export async function listReports(symbol) {
   const res = await http.get(`/reports/list/${symbol}`)
   return unwrap(res)
 }
+
+export async function addSchedule(payload) {
+  const res = await http.post('/schedule/add', payload)
+  return unwrap(res)
+}
+
+export async function removeSchedule(jobId) {
+  const res = await http.delete(`/schedule/remove/${jobId}`)
+  return unwrap(res)
+}
+
+export async function listSchedules() {
+  const res = await http.get('/schedule/list')
+  return unwrap(res).jobs
+}

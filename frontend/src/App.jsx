@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react'
-import { BarChart2, Loader2, X, Clock, ChevronRight } from 'lucide-react'
+import { BarChart2, Loader2, X, Clock, ChevronRight, CalendarCheck } from 'lucide-react'
 import AssetSelector from './components/AssetSelector'
 import Dashboard from './components/Dashboard'
+import ScheduleManager from './components/ScheduleManager'
 import { runPipeline, getPreviousRuns, listReports } from './api/client'
 import './App.css'
 
 // ── Previous Runs Modal ────────────────────────────────────────────────────
 
 function PreviousRunsModal({ onClose, onSelect }) {
-  const [runs, setRuns]     = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState(null)
+  const [runs,      setRuns]      = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(null)
   const [selecting, setSelecting] = useState(null)
 
   useEffect(() => {
@@ -38,21 +39,17 @@ function PreviousRunsModal({ onClose, onSelect }) {
           <h2 className="font-semibold text-slate-900 flex items-center gap-2">
             <Clock size={16} className="text-slate-400" /> Previous Runs
           </h2>
-          <button onClick={onClose}
-                  className="text-slate-400 hover:text-slate-600 transition-colors">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <X size={18} />
           </button>
         </div>
-
         <div className="overflow-y-auto flex-1 px-2 py-2">
           {loading && (
             <div className="flex items-center justify-center py-12 text-slate-400">
               <Loader2 className="animate-spin mr-2" size={18} /> Loading…
             </div>
           )}
-          {error && (
-            <p className="text-sm text-red-600 px-4 py-3">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600 px-4 py-3">{error}</p>}
           {runs?.length === 0 && (
             <p className="text-sm text-slate-400 px-4 py-3">No previous runs found.</p>
           )}
@@ -68,13 +65,12 @@ function PreviousRunsModal({ onClose, onSelect }) {
                 </p>
                 <p className="text-xs text-slate-400 mt-0.5">
                   {run.asset_type} · {new Date(run.run_at).toLocaleString()}
-                  {run.row_count != null && ` · ${run.row_count.toLocaleString()} rows`}
+                  {run.run_at != null && ` · ${run.row_count?.toLocaleString()} rows`}
                 </p>
               </div>
               {selecting === run.symbol
                 ? <Loader2 size={15} className="animate-spin text-slate-400 shrink-0" />
-                : <ChevronRight size={15} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
-              }
+                : <ChevronRight size={15} className="text-slate-300 group-hover:text-slate-500 shrink-0" />}
             </button>
           ))}
         </div>
@@ -103,11 +99,12 @@ function LoadingOverlay({ message }) {
 // ── App ────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [view, setView]           = useState('idle')
-  const [result, setResult]       = useState(null)
-  const [error, setError]         = useState(null)
-  const [loadingMsg, setLoadingMsg] = useState('')
-  const [showRuns, setShowRuns]   = useState(false)
+  const [view,        setView]        = useState('idle')
+  const [result,      setResult]      = useState(null)
+  const [error,       setError]       = useState(null)
+  const [loadingMsg,  setLoadingMsg]  = useState('')
+  const [showRuns,    setShowRuns]    = useState(false)
+  const [showSchedule, setShowSchedule] = useState(false)
 
   async function handleSubmit(config) {
     setError(null)
@@ -115,7 +112,6 @@ export default function App() {
     setLoadingMsg(`Fetching data for ${config.symbol}…`)
     try {
       const data = await runPipeline(config)
-      // Stitch config fields into result so Dashboard can access period/interval
       setResult({ ...data, period: config.period, interval: config.interval })
       setView('done')
     } catch (err) {
@@ -125,17 +121,16 @@ export default function App() {
   }
 
   function handlePreviousRunSelect(run, reports) {
-    // Reconstruct a minimal result object from the stored run record
     setResult({
-      status:       'success',
-      symbol:       run.symbol,
+      status:        'success',
+      symbol:        run.symbol,
       summary_stats: {},
-      chart_urls:   reports.charts.map(f => `/api/reports/charts/${f}`),
-      latest_value: null,
-      asset_info:   {},
-      period:       run.period  ?? '',
-      interval:     run.interval ?? '',
-      _fromHistory: true,
+      chart_urls:    reports.charts.map(f => `/api/reports/charts/${f}`),
+      latest_value:  null,
+      asset_info:    {},
+      period:        run.period   ?? '',
+      interval:      run.interval ?? '',
+      _fromHistory:  true,
     })
     setShowRuns(false)
     setView('done')
@@ -143,7 +138,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      {/* ── Navbar ───────────────────────────────────────────────────────── */}
+
+      {/* ── Navbar ─────────────────────────────────────────────────────── */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-[1200px] mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -152,18 +148,28 @@ export default function App() {
             <span className="hidden sm:block text-slate-300">·</span>
             <span className="hidden sm:block text-sm text-slate-400">Powered by Yahoo Finance</span>
           </div>
-          <button
-            onClick={() => setShowRuns(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border
-                       border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <Clock size={14} />
-            Previous runs
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowSchedule(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border
+                         border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <CalendarCheck size={14} />
+              <span className="hidden sm:inline">Scheduled Reports</span>
+            </button>
+            <button
+              onClick={() => setShowRuns(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border
+                         border-slate-200 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              <Clock size={14} />
+              <span className="hidden sm:inline">Previous runs</span>
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ── Error banner ─────────────────────────────────────────────────── */}
+      {/* ── Error banner ───────────────────────────────────────────────── */}
       {error && (
         <div className="max-w-[1200px] mx-auto px-6 pt-4">
           <div className="flex items-start justify-between gap-3 rounded-xl border border-red-200
@@ -177,7 +183,7 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Main content ─────────────────────────────────────────────────── */}
+      {/* ── Main content ───────────────────────────────────────────────── */}
       <main className="max-w-[1200px] mx-auto px-6 py-8">
         {view === 'idle' && (
           <div className="max-w-3xl mx-auto">
@@ -192,20 +198,21 @@ export default function App() {
             </div>
           </div>
         )}
-
         {view === 'loading' && <LoadingOverlay message={loadingMsg} />}
-
         {view === 'done' && result && (
           <Dashboard result={result} onReset={() => { setView('idle'); setResult(null) }} />
         )}
       </main>
 
-      {/* ── Previous runs modal ──────────────────────────────────────────── */}
+      {/* ── Modals ─────────────────────────────────────────────────────── */}
       {showRuns && (
         <PreviousRunsModal
           onClose={() => setShowRuns(false)}
           onSelect={handlePreviousRunSelect}
         />
+      )}
+      {showSchedule && (
+        <ScheduleManager onClose={() => setShowSchedule(false)} />
       )}
     </div>
   )

@@ -1,24 +1,36 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Loader2 } from 'lucide-react'
 import { listReports } from '../api/client'
 import MetricsPanel from './MetricsPanel'
 import ChartViewer from './ChartViewer'
 import ReportDownload from './ReportDownload'
+import ScheduleModal from './ScheduleModal'
 
 export default function Dashboard({ result, onReset }) {
-  const [reports, setReports]       = useState(null)
+  const [reports,      setReports]      = useState(null)
   const [reportsError, setReportsError] = useState(null)
+  const [showSchedule, setShowSchedule] = useState(false)
 
   const { symbol, summary_stats, asset_info, latest_value } = result
 
-  // Derive display fields from asset_info or fallback to result fields
-  const name       = asset_info?.longName ?? asset_info?.shortName ?? result.name ?? symbol
-  const assetType  = asset_info?.quoteType ?? result.asset_type ?? ''
-  const period     = result.period  ?? ''
-  const interval   = result.interval ?? ''
+  const name          = asset_info?.longName ?? asset_info?.shortName ?? result.name ?? symbol
+  const assetType     = asset_info?.quoteType ?? result.asset_type ?? ''
+  const period        = result.period   ?? ''
+  const interval      = result.interval ?? ''
+  const intervalLabel = interval === '1d' ? 'Daily'
+                      : interval === '1wk' ? 'Weekly'
+                      : interval === '1mo' ? 'Monthly'
+                      : interval
 
-  const periodLabel   = period
-  const intervalLabel = interval === '1d' ? 'Daily' : interval === '1wk' ? 'Weekly' : interval === '1mo' ? 'Monthly' : interval
+  // Config object to pass to the scheduler
+  const config = {
+    symbol,
+    name,
+    asset_type: result.asset_type ?? assetType,
+    currency:   asset_info?.currency ?? 'USD',
+    period,
+    interval,
+  }
 
   useEffect(() => {
     listReports(symbol)
@@ -45,9 +57,7 @@ export default function Dashboard({ result, onReset }) {
             )}
           </div>
           <p className="mt-1 text-sm text-slate-500">
-            {periodLabel && intervalLabel
-              ? `${periodLabel} · ${intervalLabel}`
-              : periodLabel || intervalLabel}
+            {period && intervalLabel ? `${period} · ${intervalLabel}` : period || intervalLabel}
             {latest_value?.close != null && (
               <span className="ml-3 text-slate-700 font-medium">
                 Latest close: {latest_value.close.toFixed(2)}
@@ -58,18 +68,30 @@ export default function Dashboard({ result, onReset }) {
             )}
           </p>
         </div>
-        <button
-          onClick={onReset}
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300
-                     text-sm font-medium text-slate-600 bg-white hover:bg-slate-50
-                     transition-colors shrink-0"
-        >
-          <ArrowLeft size={15} />
-          Analyse another asset
-        </button>
+
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <button
+            onClick={() => setShowSchedule(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-blue-300
+                       text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100
+                       transition-colors"
+          >
+            <CalendarPlus size={15} />
+            Schedule Report
+          </button>
+          <button
+            onClick={onReset}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300
+                       text-sm font-medium text-slate-600 bg-white hover:bg-slate-50
+                       transition-colors"
+          >
+            <ArrowLeft size={15} />
+            Analyse another asset
+          </button>
+        </div>
       </div>
 
-      {/* ── Main grid: MetricsPanel + ChartViewer ──────────────────────── */}
+      {/* ── Main grid ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1">
           <MetricsPanel
@@ -103,6 +125,16 @@ export default function Dashboard({ result, onReset }) {
         name={name}
         hasPdf={reports?.has_pdf ?? false}
       />
+
+      {/* ── Schedule modal ─────────────────────────────────────────────── */}
+      {showSchedule && (
+        <ScheduleModal
+          config={config}
+          symbol={symbol}
+          name={name}
+          onClose={() => setShowSchedule(false)}
+        />
+      )}
     </div>
   )
 }
