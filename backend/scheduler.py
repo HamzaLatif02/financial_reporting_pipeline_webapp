@@ -27,23 +27,46 @@ from config import DATA_DIR  # noqa: E402 — needs _ROOT on sys.path first
 logger = logging.getLogger(__name__)
 
 _scheduler: Optional[BackgroundScheduler] = None
-_jobs_meta: dict = {}  # job_id → {config, email, schedule}
+# job_id → {config, email, schedule, token}
+# "token" is a secret credential — never log it.
+_jobs_meta: dict = {}
 _JOBS_FILE = os.path.join(DATA_DIR, "scheduled_jobs.json")
 
 
 # ── Persistence ───────────────────────────────────────────────────────────────
 
 def _save_jobs() -> None:
+    """Write _jobs_meta to disk.  The token field is intentionally persisted
+    so jobs survive restarts; treat the file like a secrets store."""
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(_JOBS_FILE, "w") as f:
         json.dump(_jobs_meta, f, indent=2, default=str)
 
 
-def _load_jobs() -> dict:
+def _load_jobs_from_disk() -> dict:
+    """Read scheduled_jobs.json and return a clean meta dict.
+
+    Disk format per entry:
+        job_id: { config, email, schedule, token }
+
+    The token is a secret credential.  It is read from disk and held in
+    memory but is never written to logs.
+    """
     if not os.path.isfile(_JOBS_FILE):
         return {}
     with open(_JOBS_FILE) as f:
-        return json.load(f)
+        raw = json.load(f)
+    result = {}
+    for job_id, meta in raw.items():
+        result[job_id] = {
+            "config":   meta.get("config",   {}),
+            "email":    meta.get("email",    ""),
+            "schedule": meta.get("schedule", {}),
+            # Preserve token exactly as stored; empty string for legacy entries
+            # that pre-date token auth (start_scheduler will back-fill them).
+            "token":    meta.get("token",    ""),
+        }
+    return result
 
 
 # ── Email ─────────────────────────────────────────────────────────────────────
@@ -142,11 +165,11 @@ def start_scheduler() -> None:
     if _scheduler and _scheduler.running:
         return
     _scheduler = BackgroundScheduler()
-    _jobs_meta = _load_jobs()
+    _jobs_meta = _load_jobs_from_disk()
     # Back-fill tokens for jobs created before token auth was added
     needs_save = False
     for meta in _jobs_meta.values():
-        if "token" not in meta:
+        if not meta.get("token"):
             meta["token"] = secrets.token_urlsafe(32)
             needs_save = True
     if needs_save:
@@ -163,8 +186,10 @@ def start_scheduler() -> None:
                 name=f"{meta['config']['symbol']} — {meta['schedule']['frequency']}",
             )
             logger.info("Restored scheduled job: %s", job_id)
-        except Exception:
-            logger.exception("Failed to restore job %s", job_id)
+        except Exception as exc:
+            # Log only the job_id and error message — never log meta,
+            # which contains the token.
+            logger.error("Failed to restore job %s: %s", job_id, exc)
     _scheduler.start()
     logger.info("Scheduler started (%d job(s) loaded)", len(_jobs_meta))
 
