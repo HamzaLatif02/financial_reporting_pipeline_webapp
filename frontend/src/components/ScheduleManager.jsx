@@ -1,17 +1,24 @@
 import { useEffect, useState } from 'react'
 import { X, CalendarCheck, Trash2 } from 'lucide-react'
-import { listSchedules, removeSchedule } from '../api/client'
+import { getSchedules, removeSchedule } from '../api/client'
+import { hasAnyTokens } from '../utils/tokenStore'
 
 export default function ScheduleManager({ onClose }) {
-  const [jobs,     setJobs]     = useState(null)
-  const [loading,  setLoading]  = useState(true)
-  const [error,    setError]    = useState(null)
-  const [removing, setRemoving] = useState(null)
+  const [jobs,      setJobs]      = useState(null)
+  const [loading,   setLoading]   = useState(true)
+  const [error,     setError]     = useState(null)
+  const [removing,  setRemoving]  = useState(null)
+  const [rowErrors, setRowErrors] = useState({}) // job_id → error message
 
   function load() {
+    if (!hasAnyTokens()) {
+      setLoading(false)
+      setJobs([])
+      return
+    }
     setLoading(true)
     setError(null)
-    listSchedules()
+    getSchedules()
       .then(setJobs)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
@@ -22,11 +29,12 @@ export default function ScheduleManager({ onClose }) {
   async function handleRemove(job) {
     if (!window.confirm(`Cancel the scheduled report for ${job.symbol}? This cannot be undone.`)) return
     setRemoving(job.job_id)
+    setRowErrors(prev => { const next = { ...prev }; delete next[job.job_id]; return next })
     try {
       await removeSchedule(job.job_id)
       setJobs(prev => prev.filter(j => j.job_id !== job.job_id))
     } catch (err) {
-      alert(`Failed to cancel: ${err.message}`)
+      setRowErrors(prev => ({ ...prev, [job.job_id]: err.message }))
     } finally {
       setRemoving(null)
     }
@@ -38,6 +46,9 @@ export default function ScheduleManager({ onClose }) {
     if (job.frequency === 'monthly') return 'Monthly'
     return job.frequency
   }
+
+  // Determine which empty-state message to show
+  const noLocalTokens = !hasAnyTokens()
 
   return (
     <div
@@ -120,12 +131,25 @@ export default function ScheduleManager({ onClose }) {
               <div style={{ marginBottom: 12 }}>
                 <CalendarCheck size={32} color="var(--text-4)" style={{ margin: '0 auto' }} />
               </div>
-              <p style={{ fontSize: '14px', color: 'var(--text-2)', margin: '0 0 6px', fontWeight: 500 }}>
-                No scheduled reports yet
-              </p>
-              <p style={{ fontSize: '13px', color: 'var(--text-3)', margin: 0 }}>
-                Run an analysis and click <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>Schedule Report</span> to set one up.
-              </p>
+              {noLocalTokens ? (
+                <>
+                  <p style={{ fontSize: '14px', color: 'var(--text-2)', margin: '0 0 6px', fontWeight: 500 }}>
+                    No scheduled reports found in this browser
+                  </p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-3)', margin: 0, maxWidth: 320, marginLeft: 'auto', marginRight: 'auto' }}>
+                    Scheduled reports are linked to the browser where they were created.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: '14px', color: 'var(--text-2)', margin: '0 0 6px', fontWeight: 500 }}>
+                    No scheduled reports yet
+                  </p>
+                  <p style={{ fontSize: '13px', color: 'var(--text-3)', margin: 0 }}>
+                    Run an analysis and click <span style={{ color: 'var(--text-2)', fontWeight: 500 }}>Schedule Report</span> to set one up.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
@@ -145,7 +169,7 @@ export default function ScheduleManager({ onClose }) {
                   <tr
                     key={job.job_id}
                     className="fp-table-row"
-                    style={{ borderBottom: '1px solid var(--border-subtle)', borderRadius: 'var(--r-md)' }}
+                    style={{ borderBottom: '1px solid var(--border-subtle)' }}
                   >
                     <td style={{ padding: '12px 12px 12px 0' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: '13px', color: 'var(--text-1)' }}>
@@ -189,6 +213,15 @@ export default function ScheduleManager({ onClose }) {
                         )}
                         Cancel
                       </button>
+                      {rowErrors[job.job_id] && (
+                        <div style={{
+                          fontSize: '11px', color: 'var(--negative)',
+                          marginTop: 5, maxWidth: 160, textAlign: 'right',
+                          lineHeight: 1.4,
+                        }}>
+                          {rowErrors[job.job_id]}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

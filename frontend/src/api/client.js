@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { saveToken, getToken, getAllTokens, removeToken } from '../utils/tokenStore'
 
 const http = axios.create({ baseURL: '/api' })
 
@@ -6,45 +7,6 @@ function unwrap(response) {
   const data = response.data
   if (data?.error) throw new Error(data.error)
   return data
-}
-
-// ── Schedule token store (localStorage) ──────────────────────────────────────
-// Persists a map of { job_id: token } so the client can authenticate its
-// own scheduled jobs across page reloads.
-
-const TOKEN_KEY = 'fp_schedule_tokens'
-
-function loadTokens() {
-  try {
-    return JSON.parse(localStorage.getItem(TOKEN_KEY) || '{}')
-  } catch {
-    return {}
-  }
-}
-
-function saveTokens(tokens) {
-  localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens))
-}
-
-function storeJobToken(jobId, token) {
-  const tokens = loadTokens()
-  tokens[jobId] = token
-  saveTokens(tokens)
-}
-
-function dropJobToken(jobId) {
-  const tokens = loadTokens()
-  delete tokens[jobId]
-  saveTokens(tokens)
-}
-
-function allTokensHeader() {
-  const tokens = Object.values(loadTokens())
-  return tokens.length ? tokens.join(',') : ''
-}
-
-function tokenForJob(jobId) {
-  return loadTokens()[jobId] || ''
 }
 
 // ── API functions ─────────────────────────────────────────────────────────────
@@ -101,25 +63,34 @@ export async function addSchedule(payload) {
   const res = await http.post('/schedule/add', payload)
   const data = unwrap(res)
   if (data.job_id && data.token) {
-    storeJobToken(data.job_id, data.token)
+    saveToken(data.job_id, data.token)
   }
   return data
 }
 
-export async function removeSchedule(jobId) {
-  const res = await http.delete(`/schedule/remove/${jobId}`, {
-    headers: { 'X-Schedule-Token': tokenForJob(jobId) },
-  })
-  const data = unwrap(res)
-  dropJobToken(jobId)
-  return data
-}
-
-export async function listSchedules() {
-  const header = allTokensHeader()
-  if (!header) return []
+export async function getSchedules() {
+  const tokens = getAllTokens()
+  if (tokens.length === 0) return []
   const res = await http.get('/schedule/list', {
-    headers: { 'X-Schedule-Token': header },
+    headers: { 'X-Schedule-Token': tokens.join(',') },
   })
   return unwrap(res).jobs
+}
+
+export async function removeSchedule(jobId) {
+  const token = getToken(jobId)
+  if (!token) throw new Error('No token found for this job')
+  try {
+    const res = await http.delete(`/schedule/remove/${jobId}`, {
+      headers: { 'X-Schedule-Token': token },
+    })
+    const data = unwrap(res)
+    removeToken(jobId)
+    return data
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error('Invalid token — cannot cancel this job')
+    }
+    throw err
+  }
 }

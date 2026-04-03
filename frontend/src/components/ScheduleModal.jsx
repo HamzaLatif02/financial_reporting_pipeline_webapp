@@ -153,6 +153,10 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--text-1)', marginBottom: 6 }}>
                   Report Scheduled!
                 </div>
+                <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-2)' }}>
+                  A secret access token has been saved to your browser.
+                  You can manage this report from the Scheduled Reports panel.
+                </p>
                 {success.next_run && (
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
                     First report arrives on{' '}
