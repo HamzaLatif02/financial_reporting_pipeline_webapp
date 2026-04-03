@@ -1,11 +1,17 @@
-import { Download } from 'lucide-react'
+import { Download, FileText } from 'lucide-react'
 import { getPdfUrl } from '../api/client'
 
 export default function ReportDownload({ symbol, name, hasPdf }) {
   if (!hasPdf) {
     return (
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-400">
-        PDF report not available for {symbol}.
+      <div style={{
+        background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+        borderRadius: 'var(--r-lg)', padding: '14px 18px',
+        fontSize: '13px', color: 'var(--text-3)',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
+        <FileText size={14} color="var(--text-4)" />
+        PDF report not yet available for {symbol}.
       </div>
     )
   }
@@ -13,22 +19,46 @@ export default function ReportDownload({ symbol, name, hasPdf }) {
   const filename = `${symbol}_report.pdf`
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white px-5 py-5 flex flex-col sm:flex-row sm:items-center gap-4">
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-slate-900 truncate">{filename}</p>
-        {name && <p className="text-sm text-slate-500 mt-0.5">{name}</p>}
-        <p className="text-xs text-slate-400 mt-2">
-          Generated from Yahoo Finance data. Not financial advice.
-        </p>
+    <div className="fp-card" style={{
+      padding: '20px 24px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      gap: 20, flexWrap: 'wrap',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        {/* File icon */}
+        <div style={{
+          width: 40, height: 40, borderRadius: 'var(--r-md)',
+          background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <FileText size={18} color="var(--accent)" />
+        </div>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontWeight: 500,
+            fontSize: '13px', color: 'var(--text-1)',
+          }}>
+            {filename}
+          </div>
+          {name && (
+            <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: 2 }}>
+              {name}
+            </div>
+          )}
+          <div style={{ fontSize: '11px', color: 'var(--text-4)', marginTop: 4 }}>
+            Generated from Yahoo Finance data · Not financial advice
+          </div>
+        </div>
       </div>
+
       <a
         href={getPdfUrl(symbol)}
         download={filename}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-blue-600 text-white
-                   text-sm font-semibold hover:bg-blue-700 active:bg-blue-800
-                   transition-colors shrink-0"
+        className="fp-btn-accent"
+        style={{ padding: '10px 20px', textDecoration: 'none', flexShrink: 0 }}
       >
-        <Download size={16} />
+        <Download size={15} />
         Download PDF
       </a>
     </div>

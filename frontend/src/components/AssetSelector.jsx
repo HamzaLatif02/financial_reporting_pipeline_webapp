@@ -1,25 +1,21 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Loader2, Search } from 'lucide-react'
+import { CheckCircle, XCircle, Search } from 'lucide-react'
 import { getCategories, getPeriods, getIntervals, validateTicker } from '../api/client'
 
 export default function AssetSelector({ onSubmit, isLoading }) {
   const [categories, setCategories] = useState({})
-  const [periods, setPeriods]       = useState([])
-  const [intervals, setIntervals]   = useState([])
-  const [fetching, setFetching]     = useState(true)
+  const [periods,    setPeriods]    = useState([])
+  const [intervals,  setIntervals]  = useState([])
+  const [fetching,   setFetching]   = useState(true)
   const [fetchError, setFetchError] = useState(null)
 
-  const [activeCategory, setActiveCategory] = useState(null)
-  const [selectedAsset, setSelectedAsset]   = useState(null) // { symbol, name, asset_type, currency }
-
-  const [customSymbol, setCustomSymbol]   = useState('')
-  const [validating, setValidating]       = useState(false)
-  const [validationResult, setValidationResult] = useState(null) // { valid, info?, error? }
-
-  const [period, setPeriod]     = useState(null)
-  const [interval, setInterval] = useState(null)
-
-  // ── Load reference data ──────────────────────────────────────────────────
+  const [activeCategory,   setActiveCategory]   = useState(null)
+  const [selectedAsset,    setSelectedAsset]    = useState(null)
+  const [customSymbol,     setCustomSymbol]     = useState('')
+  const [validating,       setValidating]       = useState(false)
+  const [validationResult, setValidationResult] = useState(null)
+  const [period,    setPeriod]   = useState(null)
+  const [interval,  setInterval] = useState(null)
 
   function loadData() {
     setFetching(true)
@@ -37,14 +33,12 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
   useEffect(() => { loadData() }, [])
 
-  // ── Handlers ─────────────────────────────────────────────────────────────
-
   function selectExample(example) {
     setSelectedAsset({
       symbol:     example.symbol,
       name:       example.name,
       asset_type: activeCategory,
-      currency:   'USD', // will be resolved by validate_ticker during pipeline run
+      currency:   'USD',
     })
     setCustomSymbol('')
     setValidationResult(null)
@@ -81,31 +75,30 @@ export default function AssetSelector({ onSubmit, isLoading }) {
     onSubmit({ ...selectedAsset, period, interval })
   }
 
-  // ── Derived state ─────────────────────────────────────────────────────────
-
   const canSubmit = selectedAsset && period && interval && !isLoading
   const examples  = activeCategory ? (categories[activeCategory]?.examples ?? []) : []
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Loading state ─────────────────────────────────────────────────────────
 
   if (fetching) {
     return (
-      <div className="flex items-center justify-center py-20 text-slate-500">
-        <Loader2 className="animate-spin mr-2" size={22} />
-        Loading asset data…
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '64px 0', gap: 12, color: 'var(--text-3)' }}>
+        <svg className="fp-spinner" width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="8" stroke="var(--border-bright)" strokeWidth="1.5" />
+          <path d="M10 2a8 8 0 0 1 8 8" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
+        <span style={{ fontSize: '13px' }}>Loading asset data…</span>
       </div>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="flex flex-col items-center gap-4 py-12 text-center">
-        <p className="text-sm text-red-600">Failed to load asset data: {fetchError}</p>
-        <button
-          onClick={loadData}
-          className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium
-                     hover:bg-slate-700 transition-colors"
-        >
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '48px 0', textAlign: 'center' }}>
+        <p style={{ fontSize: '13px', color: 'var(--negative)' }}>
+          Failed to load asset data: {fetchError}
+        </p>
+        <button className="fp-btn-ghost" onClick={loadData} style={{ padding: '8px 18px' }}>
           Retry
         </button>
       </div>
@@ -113,31 +106,24 @@ export default function AssetSelector({ onSubmit, isLoading }) {
   }
 
   return (
-    <div className="space-y-8">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* ── Category tabs ──────────────────────────────────────────────── */}
+      {/* ── Category tabs — segmented control ─────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Asset Category
-        </h2>
-        <div className="flex flex-wrap gap-2">
+        <span className="fp-section-label">Asset Category</span>
+        <div className="fp-seg-control">
           {Object.keys(categories).map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={[
-                'px-4 py-2 rounded-full text-sm font-medium transition-colors',
-                activeCategory === cat
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
-              ].join(' ')}
+              className={`fp-seg-btn ${activeCategory === cat ? 'active' : ''}`}
             >
               {cat}
             </button>
           ))}
         </div>
         {activeCategory && (
-          <p className="mt-2 text-xs text-slate-400">
+          <p style={{ marginTop: 8, fontSize: '12px', color: 'var(--text-3)' }}>
             {categories[activeCategory]?.description}
           </p>
         )}
@@ -145,32 +131,35 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
       {/* ── Example asset cards ────────────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Select Asset
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <span className="fp-section-label">Select Asset</span>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+          gap: 10,
+        }}>
           {examples.map(ex => {
             const isSelected = selectedAsset?.symbol === ex.symbol
             return (
               <button
                 key={ex.symbol}
                 onClick={() => selectExample(ex)}
-                className={[
-                  'text-left rounded-xl border p-4 transition-all',
-                  isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-sm ring-1 ring-blue-500'
-                    : 'border-slate-200 bg-white hover:border-blue-300 hover:shadow-sm',
-                ].join(' ')}
+                className={`fp-asset-card ${isSelected ? 'selected' : ''}`}
               >
-                <span className="block font-mono font-semibold text-slate-800 text-sm">
-                  {ex.symbol}
-                </span>
-                <span className="block text-xs text-slate-500 mt-0.5 leading-tight">
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontWeight: 500,
+                    fontSize: '13px', color: 'var(--text-1)',
+                    letterSpacing: '0.03em',
+                  }}>
+                    {ex.symbol}
+                  </span>
+                  {isSelected && (
+                    <CheckCircle size={13} color="var(--accent)" style={{ flexShrink: 0, marginTop: 1 }} />
+                  )}
+                </div>
+                <span style={{ fontSize: '11px', color: 'var(--text-3)', lineHeight: 1.4, display: 'block' }}>
                   {ex.name}
                 </span>
-                {isSelected && (
-                  <CheckCircle size={14} className="mt-2 text-blue-500" />
-                )}
               </button>
             )
           })}
@@ -179,47 +168,58 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
       {/* ── Custom ticker ──────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Or Enter a Custom Ticker
-        </h2>
-        <div className="flex gap-2 items-start">
-          <div className="relative flex-1 max-w-xs">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <span className="fp-section-label">Or Enter a Custom Ticker</span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+          <div style={{ position: 'relative', flex: 1, maxWidth: 280 }}>
+            <Search
+              size={14}
+              color="var(--text-3)"
+              style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+            />
             <input
               type="text"
               placeholder="e.g. TSLA, BTC-USD"
               value={customSymbol}
-              onChange={e => {
-                setCustomSymbol(e.target.value)
-                setValidationResult(null)
-              }}
+              onChange={e => { setCustomSymbol(e.target.value); setValidationResult(null) }}
               onKeyDown={e => e.key === 'Enter' && handleValidate()}
-              className="w-full pl-9 pr-3 py-2 rounded-lg border border-slate-300 text-sm
-                         focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+              className="fp-input"
+              style={{
+                paddingLeft: 34,
+                fontFamily: 'var(--font-mono)',
+                fontSize: '13px',
+                textTransform: 'uppercase',
+              }}
             />
           </div>
           <button
             onClick={handleValidate}
             disabled={!customSymbol.trim() || validating}
-            className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium
-                       hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed
-                       transition-colors flex items-center gap-1.5"
+            className="fp-btn-ghost"
+            style={{ padding: '8px 16px', flexShrink: 0 }}
           >
-            {validating && <Loader2 size={14} className="animate-spin" />}
+            {validating ? (
+              <svg className="fp-spinner" width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <circle cx="6.5" cy="6.5" r="5" stroke="var(--border-bright)" strokeWidth="1.5" />
+                <path d="M6.5 1.5a5 5 0 0 1 5 5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            ) : null}
             Validate
           </button>
         </div>
 
         {validationResult && (
-          <div className={[
-            'mt-2 flex items-start gap-2 text-sm rounded-lg px-3 py-2',
-            validationResult.valid
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200',
-          ].join(' ')}>
+          <div style={{
+            marginTop: 8,
+            display: 'flex', alignItems: 'flex-start', gap: 8,
+            padding: '9px 13px', borderRadius: 'var(--r-md)',
+            fontSize: '13px',
+            background: validationResult.valid ? 'var(--positive-dim)' : 'var(--negative-dim)',
+            border: `1px solid ${validationResult.valid ? 'rgba(43,196,138,0.25)' : 'rgba(240,100,112,0.25)'}`,
+            color: validationResult.valid ? 'var(--positive)' : 'var(--negative)',
+          }}>
             {validationResult.valid
-              ? <CheckCircle size={15} className="mt-0.5 shrink-0" />
-              : <XCircle    size={15} className="mt-0.5 shrink-0" />
+              ? <CheckCircle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              : <XCircle    size={14} style={{ marginTop: 1, flexShrink: 0 }} />
             }
             <span>
               {validationResult.valid
@@ -233,20 +233,13 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
       {/* ── Period ─────────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Period
-        </h2>
-        <div className="flex flex-wrap gap-2">
+        <span className="fp-section-label">Period</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {periods.map(p => (
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={[
-                'px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors',
-                period === p.value
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400',
-              ].join(' ')}
+              className={`fp-pill-btn ${period === p.value ? 'active' : ''}`}
             >
               {p.label}
             </button>
@@ -256,20 +249,13 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
       {/* ── Interval ───────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
-          Interval
-        </h2>
-        <div className="flex flex-wrap gap-2">
+        <span className="fp-section-label">Interval</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {intervals.map(iv => (
             <button
               key={iv.value}
               onClick={() => setInterval(iv.value)}
-              className={[
-                'px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors',
-                interval === iv.value
-                  ? 'border-blue-500 bg-blue-50 text-blue-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400',
-              ].join(' ')}
+              className={`fp-pill-btn ${interval === iv.value ? 'active' : ''}`}
             >
               {iv.label}
             </button>
@@ -279,25 +265,47 @@ export default function AssetSelector({ onSubmit, isLoading }) {
 
       {/* ── Selected summary ───────────────────────────────────────────── */}
       {selectedAsset && (
-        <div className="rounded-xl bg-slate-50 border border-slate-200 px-5 py-4 text-sm text-slate-700">
-          <span className="font-semibold text-slate-900">{selectedAsset.symbol}</span>
-          {' · '}{selectedAsset.name}
-          {period   && <span className="ml-3 text-slate-500">Period: <strong>{period}</strong></span>}
-          {interval && <span className="ml-3 text-slate-500">Interval: <strong>{interval}</strong></span>}
+        <div style={{
+          background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
+          borderRadius: 'var(--r-lg)', padding: '12px 16px',
+          fontSize: '13px', color: 'var(--text-2)',
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-1)' }}>
+            {selectedAsset.symbol}
+          </span>
+          {selectedAsset.name && (
+            <span style={{ color: 'var(--text-3)' }}>— {selectedAsset.name}</span>
+          )}
+          {period && (
+            <span className="fp-badge fp-badge-neutral" style={{ marginLeft: 'auto' }}>
+              {period}
+            </span>
+          )}
+          {interval && (
+            <span className="fp-badge fp-badge-neutral">{interval}</span>
+          )}
         </div>
       )}
 
-      {/* ── Run button ─────────────────────────────────────────────────── */}
+      {/* ── Run Analysis button ────────────────────────────────────────── */}
       <button
         onClick={handleSubmit}
         disabled={!canSubmit}
-        className="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold text-sm
-                   hover:bg-blue-700 active:bg-blue-800
-                   disabled:opacity-40 disabled:cursor-not-allowed
-                   transition-colors flex items-center justify-center gap-2"
+        className="fp-btn-accent"
+        style={{ width: '100%', padding: '14px 24px', fontSize: '15px', borderRadius: 'var(--r-lg)' }}
       >
-        {isLoading && <Loader2 size={16} className="animate-spin" />}
-        {isLoading ? 'Running Analysis…' : 'Run Analysis'}
+        {isLoading ? (
+          <>
+            <svg className="fp-spinner" width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="rgba(4,8,16,0.35)" strokeWidth="1.5" />
+              <path d="M8 2a6 6 0 0 1 6 6" stroke="#040810" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+            Running Analysis…
+          </>
+        ) : (
+          'Run Analysis'
+        )}
       </button>
     </div>
   )

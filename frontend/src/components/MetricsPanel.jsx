@@ -1,3 +1,5 @@
+// ── Formatters ──────────────────────────────────────────────────────────────
+
 function fmt(value, key) {
   if (value == null) return 'N/A'
   const pctKeys = [
@@ -10,15 +12,16 @@ function fmt(value, key) {
   return String(value)
 }
 
-function color(value, key) {
+// Returns 'positive' | 'negative' | 'null' | 'neutral'
+function colorKey(value, key) {
   const alwaysRed   = ['max_drawdown_pct', 'worst_day_pct']
   const alwaysGreen = ['best_day_pct']
-  if (alwaysRed.includes(key))   return 'text-red-600'
-  if (alwaysGreen.includes(key)) return 'text-green-600'
-  if (value == null)             return 'text-slate-400'
-  if (typeof value === 'number' && value > 0) return 'text-green-600'
-  if (typeof value === 'number' && value < 0) return 'text-red-600'
-  return 'text-slate-900'
+  if (alwaysRed.includes(key))   return 'negative'
+  if (alwaysGreen.includes(key)) return 'positive'
+  if (value == null)             return 'null'
+  if (typeof value === 'number' && value > 0) return 'positive'
+  if (typeof value === 'number' && value < 0) return 'negative'
+  return 'neutral'
 }
 
 function fmtMarketCap(v) {
@@ -31,13 +34,13 @@ function fmtMarketCap(v) {
 
 const METRIC_LABELS = {
   total_return_pct:      'Total Return',
-  annualised_return_pct: 'Annualised Return',
+  annualised_return_pct: 'Ann. Return',
   volatility_pct:        'Volatility',
   sharpe_ratio:          'Sharpe Ratio',
   max_drawdown_pct:      'Max Drawdown',
   best_day_pct:          'Best Day',
   worst_day_pct:         'Worst Day',
-  avg_daily_volume:      'Avg Daily Volume',
+  avg_daily_volume:      'Avg Volume',
 }
 
 const METRIC_KEYS = Object.keys(METRIC_LABELS)
@@ -47,23 +50,59 @@ const INFO_CONFIG = [
   { key: 'industry',         label: 'Industry' },
   { key: 'marketCap',        label: 'Market Cap',     fmt: fmtMarketCap },
   { key: 'trailingPE',       label: 'P/E Ratio',      fmt: v => v?.toFixed(2) },
-  { key: 'fiftyTwoWeekHigh', label: '52-Week High',   fmt: v => v?.toFixed(2) },
-  { key: 'fiftyTwoWeekLow',  label: '52-Week Low',    fmt: v => v?.toFixed(2) },
+  { key: 'fiftyTwoWeekHigh', label: '52W High',        fmt: v => v?.toFixed(2) },
+  { key: 'fiftyTwoWeekLow',  label: '52W Low',         fmt: v => v?.toFixed(2) },
   { key: 'dividendYield',    label: 'Dividend Yield', fmt: v => v != null ? `${(v * 100).toFixed(2)}%` : null },
 ]
 
-function MetricCard({ metricKey, value }) {
+// ── Metric Card ──────────────────────────────────────────────────────────────
+
+function MetricCard({ metricKey, value, animIndex }) {
+  const ck    = colorKey(value, metricKey)
+  const fmtd  = fmt(value, metricKey)
+
+  const numColor = ck === 'positive' ? 'var(--positive)'
+                 : ck === 'negative' ? 'var(--negative)'
+                 : ck === 'null'     ? 'var(--text-3)'
+                 : 'var(--text-1)'
+
+  const numBg = ck === 'positive' ? 'var(--positive-dim)'
+              : ck === 'negative' ? 'var(--negative-dim)'
+              : 'transparent'
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 flex flex-col gap-1">
-      <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+    <div
+      className="fp-metric-card"
+      style={{ animationDelay: `${animIndex * 0.065}s` }}
+    >
+      <div style={{
+        fontSize: '10px', fontWeight: 600,
+        letterSpacing: '0.07em', textTransform: 'uppercase',
+        color: 'var(--text-3)',
+        marginBottom: 10,
+        fontFamily: 'var(--font-body)',
+      }}>
         {METRIC_LABELS[metricKey]}
-      </span>
-      <span className={`text-xl font-bold tabular-nums ${color(value, metricKey)}`}>
-        {fmt(value, metricKey)}
-      </span>
+      </div>
+      <div style={{
+        display: 'inline-block',
+        fontFamily: 'var(--font-mono)',
+        fontWeight: 500,
+        fontSize: '1.25rem',
+        color: numColor,
+        lineHeight: 1.2,
+        background: numBg,
+        padding: numBg !== 'transparent' ? '2px 6px' : '0',
+        borderRadius: 'var(--r-sm)',
+        letterSpacing: '-0.01em',
+      }}>
+        {fmtd}
+      </div>
     </div>
   )
 }
+
+// ── MetricsPanel ─────────────────────────────────────────────────────────────
 
 export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol, name }) {
   const infoRows = INFO_CONFIG
@@ -77,25 +116,33 @@ export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol
     .filter(Boolean)
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <div>
-        <h2 className="text-lg font-semibold text-slate-900">
-          {symbol}
-          {name && <span className="ml-2 text-slate-400 font-normal text-base">— {name}</span>}
-        </h2>
+        <div style={{
+          fontFamily: 'var(--font-display)', fontWeight: 700,
+          fontSize: '16px', color: 'var(--text-1)',
+          display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+        }}>
+          <span style={{ fontFamily: 'var(--font-mono)' }}>{symbol}</span>
+          {name && name !== symbol && (
+            <span style={{ fontFamily: 'var(--font-body)', fontWeight: 400, fontSize: '13px', color: 'var(--text-3)' }}>
+              — {name}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── Metric cards ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        {METRIC_KEYS.map(key => {
-          const value = summaryStats[key] ?? null
-          const formatted = fmt(value, key)
-          const wide = key === 'avg_daily_volume' && formatted.length > 11
+      {/* ── Metric cards grid ──────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {METRIC_KEYS.map((key, i) => {
+          const value   = summaryStats[key] ?? null
+          const fmtd    = fmt(value, key)
+          const wide    = key === 'avg_daily_volume' && fmtd.length > 11
           return (
-            <div key={key} className={wide ? 'col-span-2' : ''}>
-              <MetricCard metricKey={key} value={value} />
+            <div key={key} style={wide ? { gridColumn: '1 / -1' } : {}}>
+              <MetricCard metricKey={key} value={value} animIndex={i} />
             </div>
           )
         })}
@@ -103,17 +150,38 @@ export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol
 
       {/* ── Asset info ─────────────────────────────────────────────────── */}
       {infoRows.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Asset Details
-            </span>
+        <div style={{
+          background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+          borderRadius: 'var(--r-lg)', overflow: 'hidden',
+          animation: 'fp-fade-up var(--t-slow) var(--ease) both',
+          animationDelay: `${METRIC_KEYS.length * 0.065 + 0.1}s`,
+          opacity: 0,
+        }}>
+          <div style={{
+            padding: '10px 14px',
+            borderBottom: '1px solid var(--border-subtle)',
+            background: 'var(--bg-raised)',
+          }}>
+            <span className="fp-section-label" style={{ margin: 0 }}>Asset Details</span>
           </div>
-          <dl className="divide-y divide-slate-100">
-            {infoRows.map(({ label, value }) => (
-              <div key={label} className="flex justify-between px-4 py-2.5 text-sm">
-                <dt className="text-slate-500">{label}</dt>
-                <dd className="font-medium text-slate-900 text-right">{value}</dd>
+          <dl style={{ margin: 0 }}>
+            {infoRows.map(({ label, value }, i) => (
+              <div
+                key={label}
+                style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                  padding: '8px 14px', gap: 8,
+                  borderBottom: i < infoRows.length - 1 ? '1px solid var(--border-subtle)' : 'none',
+                }}
+              >
+                <dt style={{ fontSize: '12px', color: 'var(--text-3)', flexShrink: 0 }}>{label}</dt>
+                <dd style={{
+                  margin: 0, fontFamily: 'var(--font-mono)',
+                  fontSize: '12px', fontWeight: 500, color: 'var(--text-1)',
+                  textAlign: 'right',
+                }}>
+                  {value}
+                </dd>
               </div>
             ))}
           </dl>

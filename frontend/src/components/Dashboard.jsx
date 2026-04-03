@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CalendarPlus, Loader2 } from 'lucide-react'
+import { ArrowLeft, CalendarPlus } from 'lucide-react'
 import { listReports } from '../api/client'
 import MetricsPanel from './MetricsPanel'
 import ChartViewer from './ChartViewer'
@@ -17,12 +17,11 @@ export default function Dashboard({ result, onReset }) {
   const assetType     = asset_info?.quoteType ?? result.asset_type ?? ''
   const period        = result.period   ?? ''
   const interval      = result.interval ?? ''
-  const intervalLabel = interval === '1d' ? 'Daily'
+  const intervalLabel = interval === '1d'  ? 'Daily'
                       : interval === '1wk' ? 'Weekly'
                       : interval === '1mo' ? 'Monthly'
                       : interval
 
-  // Config object to pass to the scheduler
   const config = {
     symbol,
     name,
@@ -39,61 +38,108 @@ export default function Dashboard({ result, onReset }) {
   }, [symbol])
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white px-6 py-5
-                      flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900 truncate">
-              {name}
-              <span className="ml-2 text-slate-400 font-normal">({symbol})</span>
-            </h1>
-            {assetType && (
-              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium border border-blue-200">
-                {assetType}
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-sm text-slate-500">
-            {period && intervalLabel ? `${period} · ${intervalLabel}` : period || intervalLabel}
-            {latest_value?.close != null && (
-              <span className="ml-3 text-slate-700 font-medium">
-                Latest close: {latest_value.close.toFixed(2)}
-                {latest_value.date && (
-                  <span className="ml-1 text-slate-400 font-normal">({latest_value.date})</span>
+      <div className="fp-card" style={{ padding: '20px 24px' }}>
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {/* Top row: name + actions */}
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            gap: 16, flexWrap: 'wrap',
+          }}>
+            {/* Asset identity */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <h1 style={{
+                  margin: 0,
+                  fontFamily: 'var(--font-display)', fontWeight: 700,
+                  fontSize: '1.3rem', color: 'var(--text-1)',
+                  letterSpacing: '-0.01em', lineHeight: 1.3,
+                }}>
+                  {name}
+                </h1>
+                <span className="fp-badge fp-badge-accent">{symbol}</span>
+                {assetType && (
+                  <span className="fp-badge fp-badge-neutral"
+                    style={{ textTransform: 'none', fontFamily: 'var(--font-body)', letterSpacing: 0 }}>
+                    {assetType}
+                  </span>
                 )}
-              </span>
-            )}
-          </p>
-        </div>
+              </div>
 
-        <div className="flex flex-wrap gap-2 shrink-0">
-          <button
-            onClick={() => setShowSchedule(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-blue-300
-                       text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100
-                       transition-colors"
-          >
-            <CalendarPlus size={15} />
-            Schedule Report
-          </button>
-          <button
-            onClick={onReset}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-300
-                       text-sm font-medium text-slate-600 bg-white hover:bg-slate-50
-                       transition-colors"
-          >
-            <ArrowLeft size={15} />
-            Analyse another asset
-          </button>
+              {/* Period + interval chips row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                {period && (
+                  <span style={{
+                    fontSize: '11px', fontWeight: 500,
+                    background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--r-full)', padding: '3px 10px',
+                    color: 'var(--text-2)', fontFamily: 'var(--font-mono)',
+                  }}>
+                    {period}
+                  </span>
+                )}
+                {intervalLabel && (
+                  <span style={{
+                    fontSize: '11px', fontWeight: 500,
+                    background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--r-full)', padding: '3px 10px',
+                    color: 'var(--text-2)', fontFamily: 'var(--font-mono)',
+                  }}>
+                    {intervalLabel}
+                  </span>
+                )}
+                {latest_value?.close != null && (
+                  <span style={{
+                    fontSize: '12px', color: 'var(--text-2)', marginLeft: 4,
+                  }}>
+                    Latest close:{' '}
+                    <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, color: 'var(--text-1)' }}>
+                      {latest_value.close.toFixed(2)}
+                    </span>
+                    {latest_value.date && (
+                      <span style={{ color: 'var(--text-3)', marginLeft: 4 }}>
+                        ({latest_value.date})
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowSchedule(true)}
+                className="fp-btn-primary"
+                style={{ padding: '8px 16px' }}
+              >
+                <CalendarPlus size={14} />
+                Schedule Report
+              </button>
+              <button
+                onClick={onReset}
+                className="fp-btn-ghost"
+                style={{ padding: '8px 16px' }}
+              >
+                <ArrowLeft size={14} />
+                Analyse another
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* ── Main grid ──────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, 1fr)',
+        gap: 20,
+      }} className="dashboard-grid">
+        <div style={{ gridColumn: '1 / 2' }}>
           <MetricsPanel
             summaryStats={summary_stats}
             assetInfo={asset_info}
@@ -101,27 +147,39 @@ export default function Dashboard({ result, onReset }) {
             name={name}
           />
         </div>
-        <div className="md:col-span-2">
+        <div style={{ gridColumn: '2 / 4' }}>
           {reports === null && !reportsError && (
-            <div className="flex items-center justify-center py-20 text-slate-400">
-              <Loader2 className="animate-spin mr-2" size={20} />
-              Loading charts…
+            <div className="fp-card" style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '64px 0', gap: 10, color: 'var(--text-3)',
+            }}>
+              <svg className="fp-spinner" width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <circle cx="9" cy="9" r="7" stroke="var(--border-bright)" strokeWidth="1.5" />
+                <path d="M9 2a7 7 0 0 1 7 7" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <span style={{ fontSize: '13px' }}>Loading charts…</span>
             </div>
           )}
           {reportsError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
+            <div style={{
+              background: 'var(--negative-dim)', border: '1px solid rgba(240,100,112,0.25)',
+              borderRadius: 'var(--r-lg)', padding: '14px 18px',
+              fontSize: '13px', color: 'var(--negative)',
+            }}>
               Failed to load charts: {reportsError}
             </div>
           )}
           {reports && (
-            reports.charts.length === 0
-              ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 py-12
-                                text-center text-sm text-slate-500">
-                  Charts are still generating — refresh in a moment.
-                </div>
-              )
-              : <ChartViewer symbol={symbol} charts={reports.charts} />
+            reports.charts.length === 0 ? (
+              <div className="fp-card" style={{
+                padding: '48px', textAlign: 'center',
+                fontSize: '13px', color: 'var(--text-3)',
+              }}>
+                Charts are still generating — refresh in a moment.
+              </div>
+            ) : (
+              <ChartViewer symbol={symbol} charts={reports.charts} />
+            )
           )}
         </div>
       </div>
@@ -142,6 +200,16 @@ export default function Dashboard({ result, onReset }) {
           onClose={() => setShowSchedule(false)}
         />
       )}
+
+      <style>{`
+        @media (max-width: 768px) {
+          .dashboard-grid {
+            grid-template-columns: 1fr !important;
+          }
+          .dashboard-grid > div:first-child { grid-column: 1 !important; }
+          .dashboard-grid > div:last-child  { grid-column: 1 !important; }
+        }
+      `}</style>
     </div>
   )
 }

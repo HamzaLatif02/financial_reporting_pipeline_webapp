@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, CalendarCheck, Loader2, CheckCircle } from 'lucide-react'
+import { X, CalendarCheck, CheckCircle } from 'lucide-react'
 import { addSchedule } from '../api/client'
 
 const DAYS_OF_WEEK = [
@@ -40,6 +40,20 @@ function schedulePreview({ symbol, frequency, hour, minute, dayOfWeek, day }) {
   return ''
 }
 
+function FormLabel({ children }) {
+  return (
+    <label style={{
+      display: 'block',
+      fontSize: '11px', fontWeight: 600,
+      letterSpacing: '0.07em', textTransform: 'uppercase',
+      color: 'var(--text-3)', marginBottom: 7,
+      fontFamily: 'var(--font-body)',
+    }}>
+      {children}
+    </label>
+  )
+}
+
 export default function ScheduleModal({ config, symbol, name, onClose }) {
   const [email,     setEmail]     = useState('')
   const [frequency, setFrequency] = useState('daily')
@@ -50,7 +64,7 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
 
   const [submitting, setSubmitting] = useState(false)
   const [error,      setError]      = useState(null)
-  const [success,    setSuccess]    = useState(null) // { next_run }
+  const [success,    setSuccess]    = useState(null)
 
   const preview = schedulePreview({ symbol, frequency, hour, minute, dayOfWeek, day })
 
@@ -78,80 +92,121 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+      className="fp-modal-backdrop"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col">
+      <div className="fp-modal-panel" style={{ width: '100%', maxWidth: 460 }}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-900 flex items-center gap-2">
-            <CalendarCheck size={16} className="text-blue-600" />
-            Schedule Report — {name ?? symbol}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
-            <X size={18} />
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '18px 24px',
+          borderBottom: '1px solid var(--border-subtle)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: 'var(--r-md)',
+              background: 'var(--accent-dim)', border: '1px solid rgba(79,172,247,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <CalendarCheck size={15} color="var(--accent)" />
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '15px', color: 'var(--text-1)' }}>
+                Schedule Report
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--text-3)', marginTop: 1 }}>
+                {name ?? symbol}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 6,
+              color: 'var(--text-3)', borderRadius: 'var(--r-sm)',
+              lineHeight: 1, transition: 'color var(--t-fast) var(--ease)',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = 'var(--text-1)'}
+            onMouseLeave={e => e.currentTarget.style.color = 'var(--text-3)'}
+          >
+            <X size={17} />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5">
+        {/* ── Body ───────────────────────────────────────────────────── */}
+        <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {success ? (
-            <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <CheckCircle size={40} className="text-green-500" />
-              <p className="font-semibold text-slate-800">Scheduled!</p>
-              {success.next_run && (
-                <p className="text-sm text-slate-500">
-                  Your first report will arrive on{' '}
-                  <span className="font-medium text-slate-700">
-                    {new Date(success.next_run).toLocaleString()}
-                  </span>.
-                </p>
-              )}
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 14, padding: '24px 0', textAlign: 'center',
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: '50%',
+                background: 'var(--positive-dim)', border: '1px solid rgba(43,196,138,0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <CheckCircle size={26} color="var(--positive)" />
+              </div>
+              <div>
+                <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--text-1)', marginBottom: 6 }}>
+                  Report Scheduled!
+                </div>
+                {success.next_run && (
+                  <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
+                    First report arrives on{' '}
+                    <span style={{ fontWeight: 500, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>
+                      {new Date(success.next_run).toLocaleString()}
+                    </span>.
+                  </p>
+                )}
+              </div>
               <button
                 onClick={onClose}
-                className="mt-2 px-5 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium
-                           hover:bg-blue-700 transition-colors"
+                className="fp-btn-accent"
+                style={{ marginTop: 8, padding: '9px 24px' }}
               >
-                Close
+                Done
               </button>
             </div>
           ) : (
             <>
               {/* Email */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Email Address
-                </label>
+                <FormLabel>Email Address</FormLabel>
                 <input
                   type="email"
                   placeholder="you@example.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm
-                             focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                  className="fp-input"
                 />
               </div>
 
               {/* Frequency */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Frequency
-                </label>
-                <div className="flex gap-2">
+                <FormLabel>Frequency</FormLabel>
+                <div style={{ display: 'flex', gap: 6 }}>
                   {['daily', 'weekly', 'monthly'].map(f => (
                     <button
                       key={f}
                       onClick={() => setFrequency(f)}
-                      className={[
-                        'flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors',
-                        frequency === f
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-slate-200 text-slate-600 hover:border-slate-400',
-                      ].join(' ')}
+                      className={`fp-seg-btn ${frequency === f ? 'active' : ''}`}
+                      style={{
+                        flex: 1, textTransform: 'capitalize',
+                        background: frequency === f ? 'var(--bg-hover)' : 'var(--bg-raised)',
+                        border: `1px solid ${frequency === f ? 'var(--border-bright)' : 'var(--border-default)'}`,
+                        borderRadius: 'var(--r-md)',
+                        padding: '8px 4px',
+                        cursor: 'pointer',
+                        color: frequency === f ? 'var(--text-1)' : 'var(--text-2)',
+                        fontSize: '13px', fontWeight: 500,
+                        transition: 'all var(--t-fast) var(--ease)',
+                        fontFamily: 'var(--font-body)',
+                      }}
                     >
-                      {f}
+                      {f.charAt(0).toUpperCase() + f.slice(1)}
                     </button>
                   ))}
                 </div>
@@ -159,28 +214,26 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
 
               {/* Time */}
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                  Time
-                </label>
-                <div className="flex gap-2">
+                <FormLabel>Time (24h)</FormLabel>
+                <div style={{ display: 'flex', gap: 8 }}>
                   <select
                     value={hour}
                     onChange={e => setHour(Number(e.target.value))}
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="fp-input"
+                    style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {HOURS.map(h => (
-                      <option key={h.value} value={h.value}>{h.label}h</option>
+                      <option key={h.value} value={h.value}>{h.label}:00</option>
                     ))}
                   </select>
                   <select
                     value={minute}
                     onChange={e => setMinute(Number(e.target.value))}
-                    className="flex-1 px-3 py-2 rounded-lg border border-slate-300 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="fp-input"
+                    style={{ fontFamily: 'var(--font-mono)' }}
                   >
                     {MINUTES.map(m => (
-                      <option key={m.value} value={m.value}>{m.label}m</option>
+                      <option key={m.value} value={m.value}>:{m.label}</option>
                     ))}
                   </select>
                 </div>
@@ -189,14 +242,11 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
               {/* Day of week (weekly only) */}
               {frequency === 'weekly' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                    Day of Week
-                  </label>
+                  <FormLabel>Day of Week</FormLabel>
                   <select
                     value={dayOfWeek}
                     onChange={e => setDayOfWeek(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="fp-input"
                   >
                     {DAYS_OF_WEEK.map(d => (
                       <option key={d.value} value={d.value}>{d.label}</option>
@@ -208,14 +258,11 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
               {/* Day of month (monthly only) */}
               {frequency === 'monthly' && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
-                    Day of Month
-                  </label>
+                  <FormLabel>Day of Month</FormLabel>
                   <select
                     value={day}
                     onChange={e => setDay(Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm
-                               focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    className="fp-input"
                   >
                     {DAYS_OF_MONTH.map(d => (
                       <option key={d.value} value={d.value}>{d.label}</option>
@@ -226,29 +273,38 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
 
               {/* Preview */}
               {preview && (
-                <p className="text-sm text-slate-500 bg-slate-50 border border-slate-200
-                               rounded-lg px-4 py-3 leading-relaxed">
+                <div className="fp-preview-box">
                   {preview}
-                </p>
+                </div>
               )}
 
               {/* Error */}
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                <div style={{
+                  background: 'var(--negative-dim)', border: '1px solid rgba(240,100,112,0.25)',
+                  borderRadius: 'var(--r-md)', padding: '10px 14px',
+                  fontSize: '13px', color: 'var(--negative)',
+                }}>
                   {error}
-                </p>
+                </div>
               )}
 
               {/* Submit */}
               <button
                 onClick={handleSubmit}
                 disabled={!email || submitting}
-                className="w-full py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold
-                           hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed
-                           transition-colors flex items-center justify-center gap-2"
+                className="fp-btn-accent"
+                style={{ width: '100%', padding: '11px 24px' }}
               >
-                {submitting && <Loader2 size={15} className="animate-spin" />}
-                {submitting ? 'Scheduling…' : 'Schedule'}
+                {submitting ? (
+                  <>
+                    <svg className="fp-spinner" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="5.5" stroke="rgba(4,8,16,0.3)" strokeWidth="1.5" />
+                      <path d="M7 1.5a5.5 5.5 0 0 1 5.5 5.5" stroke="#040810" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                    Scheduling…
+                  </>
+                ) : 'Schedule Report'}
               </button>
             </>
           )}
