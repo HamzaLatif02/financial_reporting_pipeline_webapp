@@ -188,7 +188,7 @@ export default function ScheduleManager({ onClose }) {
                     </td>
                     <td style={{ padding: '12px', fontSize: '12px', color: 'var(--text-2)', fontFamily: 'var(--font-mono)' }}>
                       {job.next_run_time
-                        ? new Date(job.next_run_time).toLocaleString()
+                        ? new Date(job.next_run_time.replace(' ', 'T')).toLocaleString()
                         : <span style={{ color: 'var(--text-4)' }}>—</span>
                       }
                     </td>

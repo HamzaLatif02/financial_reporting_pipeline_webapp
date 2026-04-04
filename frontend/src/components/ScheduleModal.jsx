@@ -27,16 +27,38 @@ const DAYS_OF_MONTH = Array.from({ length: 28 }, (_, i) => ({
   label: String(i + 1),
 }))
 
+// Derive a short UTC offset label from the browser, e.g. "UTC+1" or "UTC-5".
+function localTzLabel() {
+  const offset = -new Date().getTimezoneOffset() / 60
+  if (offset === 0) return 'UTC'
+  return offset > 0 ? `UTC+${offset}` : `UTC${offset}`
+}
+
+// Convert a local hour/minute to UTC, returned as { utcHour, utcMinute }.
+function toUtc(localHour, localMinute) {
+  const d = new Date()
+  d.setHours(localHour, localMinute, 0, 0)
+  return { utcHour: d.getUTCHours(), utcMinute: d.getUTCMinutes() }
+}
+
 function schedulePreview({ symbol, frequency, hour, minute, dayOfWeek, day }) {
-  const hm = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  const localHm = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+  const { utcHour, utcMinute } = toUtc(hour, minute)
+  const utcHm  = `${String(utcHour).padStart(2, '0')}:${String(utcMinute).padStart(2, '0')}`
+  const tzLabel = localTzLabel()
+  // Only show UTC suffix when the times differ (i.e. user is not in UTC)
+  const timePart = utcHm === localHm
+    ? localHm
+    : `${localHm} ${tzLabel} (${utcHm} UTC)`
+
   if (frequency === 'daily')
-    return `You will receive a report for ${symbol} every day at ${hm}.`
+    return `You will receive a report for ${symbol} every day at ${timePart}.`
   if (frequency === 'weekly') {
     const dow = DAYS_OF_WEEK.find(d => d.value === dayOfWeek)?.label ?? dayOfWeek
-    return `You will receive a report for ${symbol} every ${dow} at ${hm}.`
+    return `You will receive a report for ${symbol} every ${dow} at ${timePart}.`
   }
   if (frequency === 'monthly')
-    return `You will receive a report for ${symbol} on day ${day} of every month at ${hm}.`
+    return `You will receive a report for ${symbol} on day ${day} of every month at ${timePart}.`
   return ''
 }
 
@@ -72,12 +94,15 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
     setError(null)
     setSubmitting(true)
     try {
+      // Convert the user's local time selection to UTC so APScheduler
+      // (which runs in UTC) fires the job at the correct wall-clock time.
+      const { utcHour, utcMinute } = toUtc(hour, minute)
       const payload = {
         config,
         email,
         frequency,
-        hour,
-        minute,
+        hour:   utcHour,
+        minute: utcMinute,
         ...(frequency === 'weekly'  && { day_of_week: dayOfWeek }),
         ...(frequency === 'monthly' && { day }),
       }

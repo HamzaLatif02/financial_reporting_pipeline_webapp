@@ -16,6 +16,7 @@ from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from pytz import utc
 
 # Project root is one level above backend/
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -148,14 +149,21 @@ def _execute_job(config: dict, email: str) -> None:
 # ── Trigger builder ───────────────────────────────────────────────────────────
 
 def _build_trigger(schedule: dict) -> CronTrigger:
-    frequency  = schedule["frequency"]
-    hour       = int(schedule.get("hour", 8))
-    minute     = int(schedule.get("minute", 0))
+    """Build a UTC-pinned CronTrigger.
+
+    The hour/minute values stored on disk are always UTC (the frontend
+    converts from the user's local time before sending them).
+    Passing timezone=utc here ensures there is no ambiguity regardless
+    of the server's local timezone.
+    """
+    frequency = schedule["frequency"]
+    hour      = int(schedule.get("hour", 8))
+    minute    = int(schedule.get("minute", 0))
     if frequency == "weekly":
-        return CronTrigger(day_of_week=schedule["day_of_week"], hour=hour, minute=minute)
+        return CronTrigger(day_of_week=schedule["day_of_week"], hour=hour, minute=minute, timezone=utc)
     if frequency == "monthly":
-        return CronTrigger(day=int(schedule["day"]), hour=hour, minute=minute)
-    return CronTrigger(hour=hour, minute=minute)  # daily
+        return CronTrigger(day=int(schedule["day"]), hour=hour, minute=minute, timezone=utc)
+    return CronTrigger(hour=hour, minute=minute, timezone=utc)  # daily
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -164,7 +172,8 @@ def start_scheduler() -> None:
     global _scheduler, _jobs_meta
     if _scheduler and _scheduler.running:
         return
-    _scheduler = BackgroundScheduler()
+    _scheduler = BackgroundScheduler(timezone=utc)
+    logger.info("Scheduler timezone: %s", utc)
     _jobs_meta = _load_jobs_from_disk()
     # Back-fill tokens for jobs created before token auth was added
     needs_save = False
