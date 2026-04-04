@@ -1,14 +1,17 @@
-import { useEffect, useState } from 'react'
-import { X, CalendarCheck, Trash2 } from 'lucide-react'
-import { getSchedules, removeSchedule } from '../api/client'
+import { useEffect, useState, useRef } from 'react'
+import { X, CalendarCheck, Trash2, Send } from 'lucide-react'
+import { getSchedules, removeSchedule, sendNow } from '../api/client'
 import { hasAnyTokens } from '../utils/tokenStore'
 
 export default function ScheduleManager({ onClose }) {
-  const [jobs,      setJobs]      = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState(null)
-  const [removing,  setRemoving]  = useState(null)
-  const [rowErrors, setRowErrors] = useState({}) // job_id → error message
+  const [jobs,        setJobs]        = useState(null)
+  const [loading,     setLoading]     = useState(true)
+  const [error,       setError]       = useState(null)
+  const [removing,    setRemoving]    = useState(null)
+  const [sending,     setSending]     = useState(null)     // job_id being sent
+  const [rowErrors,   setRowErrors]   = useState({})       // job_id → error message
+  const [rowMessages, setRowMessages] = useState({})       // job_id → success message
+  const dismissTimers = useRef({})
 
   function load() {
     if (!hasAnyTokens()) {
@@ -37,6 +40,27 @@ export default function ScheduleManager({ onClose }) {
       setRowErrors(prev => ({ ...prev, [job.job_id]: err.message }))
     } finally {
       setRemoving(null)
+    }
+  }
+
+  async function handleSendNow(job) {
+    if (!window.confirm(`Send an immediate report for ${job.symbol} to ${job.email}?`)) return
+    setSending(job.job_id)
+    setRowErrors(prev  => { const n = { ...prev };  delete n[job.job_id]; return n })
+    setRowMessages(prev => { const n = { ...prev }; delete n[job.job_id]; return n })
+    try {
+      await sendNow(job.job_id)
+      const msg = `Report sent to ${job.email}`
+      setRowMessages(prev => ({ ...prev, [job.job_id]: msg }))
+      // Auto-dismiss the success message after 5 s
+      clearTimeout(dismissTimers.current[job.job_id])
+      dismissTimers.current[job.job_id] = setTimeout(() => {
+        setRowMessages(prev => { const n = { ...prev }; delete n[job.job_id]; return n })
+      }, 5000)
+    } catch (err) {
+      setRowErrors(prev => ({ ...prev, [job.job_id]: `Failed to send: ${err.message}` }))
+    } finally {
+      setSending(null)
     }
   }
 
@@ -198,25 +222,58 @@ export default function ScheduleManager({ onClose }) {
                       </span>
                     </td>
                     <td style={{ padding: '12px 0', textAlign: 'right' }}>
-                      <button
-                        onClick={() => handleRemove(job)}
-                        disabled={removing === job.job_id}
-                        className="fp-cancel-btn"
-                      >
-                        {removing === job.job_id ? (
-                          <svg className="fp-spinner" width="12" height="12" viewBox="0 0 12 12" fill="none">
-                            <circle cx="6" cy="6" r="4.5" stroke="var(--border-bright)" strokeWidth="1.5" />
-                            <path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        ) : (
-                          <Trash2 size={12} />
-                        )}
-                        Cancel
-                      </button>
+                      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                        {/* Send now */}
+                        <button
+                          onClick={() => handleSendNow(job)}
+                          disabled={sending === job.job_id || removing === job.job_id}
+                          className="fp-send-btn"
+                          title="Send report now"
+                        >
+                          {sending === job.job_id ? (
+                            <svg className="fp-spinner" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <circle cx="6" cy="6" r="4.5" stroke="var(--border-bright)" strokeWidth="1.5" />
+                              <path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5" stroke="var(--positive)" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <Send size={12} />
+                          )}
+                          Send now
+                        </button>
+
+                        {/* Cancel */}
+                        <button
+                          onClick={() => handleRemove(job)}
+                          disabled={removing === job.job_id || sending === job.job_id}
+                          className="fp-cancel-btn"
+                        >
+                          {removing === job.job_id ? (
+                            <svg className="fp-spinner" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                              <circle cx="6" cy="6" r="4.5" stroke="var(--border-bright)" strokeWidth="1.5" />
+                              <path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          ) : (
+                            <Trash2 size={12} />
+                          )}
+                          Cancel
+                        </button>
+                      </div>
+
+                      {/* Inline success message */}
+                      {rowMessages[job.job_id] && (
+                        <div style={{
+                          fontSize: '11px', color: 'var(--positive)',
+                          marginTop: 5, textAlign: 'right', lineHeight: 1.4,
+                        }}>
+                          {rowMessages[job.job_id]}
+                        </div>
+                      )}
+
+                      {/* Inline error message */}
                       {rowErrors[job.job_id] && (
                         <div style={{
                           fontSize: '11px', color: 'var(--negative)',
-                          marginTop: 5, maxWidth: 160, textAlign: 'right',
+                          marginTop: 5, maxWidth: 200, textAlign: 'right',
                           lineHeight: 1.4,
                         }}>
                           {rowErrors[job.job_id]}

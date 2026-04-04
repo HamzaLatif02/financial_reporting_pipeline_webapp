@@ -77,6 +77,22 @@ export async function getSchedules() {
   return unwrap(res).jobs
 }
 
+export async function sendNow(jobId) {
+  const token = getToken(jobId)
+  if (!token) throw new Error('No token found for this job')
+  try {
+    const res = await http.post(`/schedule/send-now/${jobId}`, null, {
+      headers: { 'X-Schedule-Token': token },
+    })
+    return unwrap(res)
+  } catch (err) {
+    if (err.response?.status === 403) {
+      throw new Error('Invalid token — cannot send this report')
+    }
+    throw err
+  }
+}
+
 export async function removeSchedule(jobId) {
   const token = getToken(jobId)
   if (!token) throw new Error('No token found for this job')

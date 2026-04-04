@@ -492,6 +492,30 @@ select.fp-input option {
 }
 .fp-table-row:hover { background: var(--bg-hover); }
 
+.fp-send-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--r-md);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--t-fast) var(--ease);
+  font-family: var(--font-body);
+}
+.fp-send-btn:hover:not(:disabled) {
+  color: var(--positive);
+  background: var(--positive-dim);
+  border-color: rgba(43, 196, 138, 0.25);
+}
+.fp-send-btn:disabled {
+  opacity: 0.40;
+  cursor: not-allowed;
+}
 .fp-cancel-btn {
   display: inline-flex;
   align-items: center;

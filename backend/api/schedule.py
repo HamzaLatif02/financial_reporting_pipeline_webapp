@@ -10,7 +10,7 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from scheduler import add_job, remove_job, list_jobs, get_stored_token  # noqa: E402
+from scheduler import add_job, remove_job, list_jobs, get_stored_token, get_job_meta  # noqa: E402
 
 schedule_bp = Blueprint("schedule", __name__)
 logger = logging.getLogger(__name__)
@@ -102,6 +102,33 @@ def remove(job_id: str):
         return jsonify({"error": f"Job '{job_id}' not found."}), 404
 
     return jsonify({"status": "removed", "job_id": job_id})
+
+
+@schedule_bp.post("/send-now/<job_id>")
+def send_now(job_id: str):
+    client_tokens = _parse_token_header()
+
+    stored_token = get_stored_token(job_id)
+    if stored_token is None:
+        return jsonify({"error": f"Job '{job_id}' not found."}), 404
+    if stored_token not in client_tokens:
+        return jsonify({"error": "Invalid token — cannot send this report."}), 403
+
+    meta = get_job_meta(job_id)
+    config = meta["config"]
+    email  = meta["email"]
+    symbol = config["symbol"]
+
+    logger.info("SEND NOW triggered for %s -> %s", symbol, email)
+
+    try:
+        from scheduler import _execute_job
+        _execute_job(config, email)
+    except Exception as exc:
+        logger.exception("send-now failed for %s", symbol)
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+    return jsonify({"status": "sent", "symbol": symbol, "email": email})
 
 
 @schedule_bp.get("/list")

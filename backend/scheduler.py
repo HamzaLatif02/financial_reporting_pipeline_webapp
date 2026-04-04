@@ -272,6 +272,11 @@ def get_stored_token(job_id: str):
     return meta["token"] if meta else None
 
 
+def get_job_meta(job_id: str):
+    """Return the full meta dict for a job, or None if it doesn't exist."""
+    return _jobs_meta.get(job_id)
+
+
 def remove_job(job_id: str) -> bool:
     if not _scheduler:
         return False
