@@ -256,12 +256,16 @@ def start_scheduler() -> None:
         logger.info("[PID %d] REGISTERED: %s | next run: %s", _pid(), j.id, j.next_run_time)
     if not user_jobs:
         logger.info("[PID %d]   (no user jobs — reschedule via the web app)", _pid())
+    logger.info("[PID %d] SCHEDULER started successfully", _pid())
     logger.info("=" * 60)
 
 
 def add_job(job_id: str, config: dict, schedule: dict, email: str, token: str) -> None:
     if not _scheduler.running:
-        raise RuntimeError("Scheduler is not running.")
+        logger.warning("[PID %d] Scheduler not running — attempting recovery start", _pid())
+        start_scheduler()
+    if not _scheduler.running:
+        raise RuntimeError("Scheduler failed to start — cannot add job")
     trigger = _build_trigger(schedule)
     _scheduler.add_job(
         _execute_job,

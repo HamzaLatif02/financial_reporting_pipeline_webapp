@@ -54,19 +54,15 @@ if _IS_PROD:
 
 
 # ── Scheduler lifecycle ───────────────────────────────────────────────────────
-import sys as _sys
 from scheduler import start_scheduler, shutdown_scheduler  # noqa: E402
+from db import init_db  # noqa: E402
 
-# Under gunicorn the post_fork hook (gunicorn.conf.py) starts the scheduler
-# inside the worker process after forking, so the scheduler thread and the
-# request handlers share the same memory space.
-#
-# Here we only start it for direct invocation (python app.py) and the
-# Werkzeug dev-server reloader child — NOT when the gunicorn master is
-# importing the app to validate it before forking.
-if "gunicorn" not in _sys.modules:
-    if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-        start_scheduler()
+# Call unconditionally at module level so it runs whenever this module is
+# imported — which is exactly what Gunicorn does.  start_scheduler() guards
+# against double-start internally (if _scheduler.running: return).
+with app.app_context():
+    init_db()
+    start_scheduler()
 
 atexit.register(shutdown_scheduler)
 
