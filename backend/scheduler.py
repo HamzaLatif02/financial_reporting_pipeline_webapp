@@ -112,14 +112,7 @@ def run_pipeline_and_email(config: dict, email: str) -> None:
         "Not financial advice."
     )
 
-    recipients = [email]
-    default_recipient = os.getenv("REPORT_RECIPIENT", "")
-    if default_recipient and default_recipient not in recipients:
-        recipients.append(default_recipient)
-
-    for addr in recipients:
-        _send_email(addr, subject, body, pdf_path)
-
+    _send_email(email, subject, body, pdf_path)
     logger.info("Pipeline and email completed for %s", symbol)
 
 
