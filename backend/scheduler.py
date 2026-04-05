@@ -11,6 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Optional
 
+PID = os.getpid()
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
@@ -154,10 +156,10 @@ def _keepalive() -> None:
 def _heartbeat() -> None:
     """Log a heartbeat every 5 minutes to confirm the scheduler thread is alive."""
     user_jobs = [j for j in _scheduler.get_jobs() if not j.id.startswith("__")]
+    ids = [j.id for j in user_jobs] or ["none"]
     logger.info(
-        "SCHEDULER HEARTBEAT — running. %d user job(s): %s",
-        len(user_jobs),
-        [j.id for j in user_jobs] or "(none — reschedule via the app)",
+        "[PID %d] SCHEDULER HEARTBEAT — %d user job(s): %s",
+        PID, len(user_jobs), ", ".join(ids),
     )
 
 
@@ -192,15 +194,15 @@ def start_scheduler() -> None:
 
     # ── Load persisted jobs from SQLite ───────────────────────────────────────
     logger.info("=" * 60)
-    logger.info("SCHEDULER STARTING  (timezone: %s)", _TZ)
+    logger.info("[PID %d] SCHEDULER STARTING  (timezone: %s)", PID, _TZ)
 
     init_db()  # ensure the scheduled_jobs table exists
     rows = load_scheduled_jobs()
     _jobs_meta = {r["job_id"]: {"config": r["config"], "email": r["email"], "schedule": r["schedule"], "token": r["token"]} for r in rows}
-    logger.info("Jobs loaded from SQLite: %d", len(_jobs_meta))
+    logger.info("[PID %d] Jobs loaded from SQLite: %d", PID, len(_jobs_meta))
 
     if not _jobs_meta:
-        logger.info("SCHEDULER: no user jobs in DB — schedule via the web app.")
+        logger.info("[PID %d] SCHEDULER: no user jobs in DB — schedule via the web app.", PID)
 
     # ── Register user-defined jobs ─────────────────────────────────────────────
     for job_id, meta in _jobs_meta.items():
@@ -214,9 +216,9 @@ def start_scheduler() -> None:
                 replace_existing=True,
                 name=f"{meta['config']['symbol']} — {meta['schedule']['frequency']}",
             )
-            logger.info("Restored job: %s", job_id)
+            logger.info("[PID %d] Restored job: %s", PID, job_id)
         except Exception as exc:
-            logger.error("Failed to restore job %s: %s", job_id, exc)
+            logger.error("[PID %d] Failed to restore job %s: %s", PID, job_id, exc)
 
     # ── Infrastructure jobs ────────────────────────────────────────────────────
     # Keepalive: pings /api/health every 14 min to prevent Render free-tier
@@ -244,11 +246,11 @@ def start_scheduler() -> None:
 
     # ── Startup summary ────────────────────────────────────────────────────────
     user_jobs = [j for j in _scheduler.get_jobs() if not j.id.startswith("__")]
-    logger.info("SCHEDULER STARTED — %d user job(s)", len(user_jobs))
+    logger.info("[PID %d] SCHEDULER STARTED — registered %d user job(s) from DB with APScheduler", PID, len(user_jobs))
     for j in user_jobs:
-        logger.info("  JOB: %s | next run: %s", j.id, j.next_run_time)
+        logger.info("[PID %d] REGISTERED: %s | next run: %s", PID, j.id, j.next_run_time)
     if not user_jobs:
-        logger.info("  (no user jobs — reschedule via the web app)")
+        logger.info("[PID %d]   (no user jobs — reschedule via the web app)", PID)
     logger.info("=" * 60)
 
 
@@ -266,7 +268,7 @@ def add_job(job_id: str, config: dict, schedule: dict, email: str, token: str) -
     )
     _jobs_meta[job_id] = {"config": config, "email": email, "schedule": schedule, "token": token}
     save_scheduled_job(job_id, config, schedule, email, token)
-    logger.info("Job added: %s", job_id)
+    logger.info("[PID %d] ADD JOB: %s", PID, job_id)
 
 
 def get_stored_token(job_id: str):
