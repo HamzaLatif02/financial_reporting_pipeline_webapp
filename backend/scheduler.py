@@ -9,7 +9,6 @@ import os
 import sys
 import urllib.request
 from pathlib import Path
-from typing import Optional
 
 PID = os.getpid()
 
@@ -19,6 +18,10 @@ from apscheduler.triggers.interval import IntervalTrigger
 from pytz import timezone
 
 _TZ = timezone("Europe/London")
+
+# Single module-level scheduler instance — never reassigned.
+# All functions (add_job, _heartbeat, etc.) reference this same object.
+_scheduler = BackgroundScheduler(timezone=_TZ)
 
 # Project root is one level above backend/
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -155,7 +158,9 @@ def _keepalive() -> None:
 
 def _heartbeat() -> None:
     """Log a heartbeat every 5 minutes to confirm the scheduler thread is alive."""
-    user_jobs = [j for j in _scheduler.get_jobs() if not j.id.startswith("__")]
+    all_jobs = _scheduler.get_jobs()
+    logger.info("[PID %d] ALL JOBS IN SCHEDULER: %s", PID, [j.id for j in all_jobs])
+    user_jobs = [j for j in all_jobs if not j.id.startswith("__")]
     ids = [j.id for j in user_jobs] or ["none"]
     logger.info(
         "[PID %d] SCHEDULER HEARTBEAT — %d user job(s): %s",
@@ -186,11 +191,9 @@ def _build_trigger(schedule: dict) -> CronTrigger:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 def start_scheduler() -> None:
-    global _scheduler, _jobs_meta
-    if _scheduler and _scheduler.running:
+    global _jobs_meta
+    if _scheduler.running:
         return
-
-    _scheduler = BackgroundScheduler(timezone=_TZ)
 
     # ── Load persisted jobs from SQLite ───────────────────────────────────────
     logger.info("=" * 60)
@@ -255,7 +258,7 @@ def start_scheduler() -> None:
 
 
 def add_job(job_id: str, config: dict, schedule: dict, email: str, token: str) -> None:
-    if not _scheduler:
+    if not _scheduler.running:
         raise RuntimeError("Scheduler is not running.")
     trigger = _build_trigger(schedule)
     _scheduler.add_job(
@@ -283,7 +286,7 @@ def get_job_meta(job_id: str):
 
 
 def remove_job(job_id: str) -> bool:
-    if not _scheduler:
+    if not _scheduler.running:
         return False
     try:
         _scheduler.remove_job(job_id)
@@ -297,7 +300,7 @@ def remove_job(job_id: str) -> bool:
 
 
 def list_jobs() -> list:
-    if not _scheduler:
+    if not _scheduler.running:
         return []
     result = []
     apscheduler_jobs = {j.id: j for j in _scheduler.get_jobs()}
@@ -315,7 +318,6 @@ def list_jobs() -> list:
 
 
 def shutdown_scheduler() -> None:
-    global _scheduler
-    if _scheduler and _scheduler.running:
+    if _scheduler.running:
         _scheduler.shutdown(wait=False)
         logger.info("Scheduler shut down.")
