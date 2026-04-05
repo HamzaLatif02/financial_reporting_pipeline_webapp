@@ -40,7 +40,11 @@ app.register_blueprint(schedule_bp, url_prefix="/api/schedule")
 
 @app.get("/api/health")
 def health():
-    return jsonify({"status": "ok"})
+    from scheduler import _scheduler, start_scheduler
+    if not _scheduler.running:
+        logger.warning("Health check: scheduler stopped — restarting")
+        start_scheduler()
+    return jsonify({"status": "ok", "scheduler_running": _scheduler.running})
 
 
 if _IS_PROD:

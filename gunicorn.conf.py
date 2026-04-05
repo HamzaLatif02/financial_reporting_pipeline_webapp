@@ -4,7 +4,14 @@ when gunicorn is invoked with --chdir backend and -c ../gunicorn.conf.py.
 
 Placing settings here (rather than on the command line) avoids silent
 truncation or misquoting by Render's deploy infrastructure.
+
+gevent worker: long-running pipeline requests (yfinance fetch + PDF gen)
+are I/O-bound.  gevent's cooperative multitasking handles them without
+blocking the worker or triggering Gunicorn's SIGABRT timeout kill.
 """
-workers = 1        # exactly one worker — APScheduler is not multi-process safe
-timeout = 120      # allow long-running pipeline requests (fetcher + PDF gen)
-loglevel = "info"
+worker_class       = "gevent"
+workers            = 1    # exactly one worker — APScheduler is not multi-process safe
+worker_connections = 100
+timeout            = 300  # generous ceiling; gevent doesn't use sync-worker heartbeat
+keepalive          = 5
+loglevel           = "info"
