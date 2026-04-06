@@ -85,7 +85,7 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
         ...(frequency === 'monthly' && { day }),
       }
       const res = await addSchedule(payload)
-      setSuccess({ next_run: res.next_run })
+      setSuccess({ pending: res.status === 'pending', email: res.email, message: res.message })
     } catch (err) {
       setError(err.message)
     } finally {
@@ -154,18 +154,21 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
               </div>
               <div>
                 <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: '16px', color: 'var(--text-1)', marginBottom: 6 }}>
-                  Report Scheduled!
+                  {success.pending ? 'Confirmation Email Sent!' : 'Report Scheduled!'}
                 </div>
-                <p style={{ margin: '0 0 8px', fontSize: '13px', color: 'var(--text-2)' }}>
-                  A secret access token has been saved to your browser.
-                  You can manage this report from the Scheduled Reports panel.
-                </p>
-                {success.next_run && (
+                {success.pending ? (
+                  <>
+                    <p style={{ margin: '0 0 6px', fontSize: '13px', color: 'var(--text-2)' }}>
+                      A confirmation email has been sent to{' '}
+                      <span style={{ fontWeight: 500, color: 'var(--text-1)' }}>{success.email}</span>.
+                    </p>
+                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-3)' }}>
+                      Click the link in that email to activate your scheduled report.
+                    </p>
+                  </>
+                ) : (
                   <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-2)' }}>
-                    First report arrives on{' '}
-                    <span style={{ fontWeight: 500, color: 'var(--text-1)', fontFamily: 'var(--font-mono)' }}>
-                      {new Date(success.next_run).toLocaleString()}
-                    </span>.
+                    Your report has been activated and will be delivered on schedule.
                   </p>
                 )}
               </div>

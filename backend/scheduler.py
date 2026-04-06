@@ -31,7 +31,11 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
-from pg_jobs import init_pg_jobs_table, pg_save_job, pg_load_jobs, pg_delete_job  # noqa: E402
+from pg_jobs import (  # noqa: E402
+    init_pg_jobs_table, pg_save_job,
+    pg_load_confirmed_jobs, pg_delete_job,
+    pg_get_token_for_job, pg_get_job,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -201,9 +205,9 @@ def start_scheduler() -> None:
     logger.info("[PID %d] SCHEDULER STARTING  (timezone: %s)", _pid(), _TZ)
 
     init_pg_jobs_table()
-    rows = pg_load_jobs()
+    rows = pg_load_confirmed_jobs()
     _jobs_meta = {r["job_id"]: {"config": r["config"], "email": r["email"], "schedule": r["schedule"], "token": r["token"]} for r in rows}
-    logger.info("[PID %d] Jobs loaded from PostgreSQL: %d", _pid(), len(_jobs_meta))
+    logger.info("[PID %d] Confirmed jobs loaded from PostgreSQL: %d", _pid(), len(_jobs_meta))
 
     if not _jobs_meta:
         logger.info("[PID %d] SCHEDULER: no user jobs in DB — schedule via the web app.", _pid())
@@ -259,12 +263,46 @@ def start_scheduler() -> None:
     logger.info("=" * 60)
 
 
-def add_job(job_id: str, config: dict, schedule: dict, email: str, token: str) -> None:
+def add_job(
+    job_id: str,
+    config: dict,
+    schedule: dict,
+    email: str,
+    token: str,
+    confirm_token: str,
+) -> None:
+    """Save a pending job to PostgreSQL. Does NOT register with APScheduler.
+
+    The job will only be activated (and start firing) after the user
+    clicks the confirmation link in the email they receive.
+    """
+    pg_save_job(
+        job_id, config, schedule, email, token,
+        confirmed=False,
+        confirm_token=confirm_token,
+    )
+    logger.info("[PID %d] PENDING JOB saved: %s → %s", _pid(), job_id, email)
+
+
+def activate_job(job_id: str) -> str:
+    """Register a confirmed job with APScheduler and update _jobs_meta.
+
+    Called from the confirmation endpoint after the user verifies their email.
+    Returns the next run time string.
+    """
     if not _scheduler.running:
-        logger.warning("[PID %d] Scheduler not running — attempting recovery start", _pid())
         start_scheduler()
-    if not _scheduler.running:
-        raise RuntimeError("Scheduler failed to start — cannot add job")
+
+    confirmed_jobs = pg_load_confirmed_jobs()
+    job = next((j for j in confirmed_jobs if j["job_id"] == job_id), None)
+    if not job:
+        raise ValueError(f"Confirmed job not found: {job_id}")
+
+    config   = job["config"]
+    schedule = job["schedule"]
+    email    = job["email"]
+    token    = job["token"]
+
     trigger = _build_trigger(schedule)
     _scheduler.add_job(
         _execute_job,
@@ -274,35 +312,45 @@ def add_job(job_id: str, config: dict, schedule: dict, email: str, token: str) -
         replace_existing=True,
         name=f"{config['symbol']} — {schedule['frequency']}",
     )
-    # Force the in-memory job store to refresh, then confirm the job is live.
+
+    # Force job store refresh then confirm live
     try:
         _scheduler._jobstores["default"].get_all_jobs()
     except Exception:
         pass
+
     live_job = _scheduler.get_job(job_id)
-    if live_job:
-        logger.info(
-            "[PID %d] ADD JOB confirmed in live scheduler: %s | next run: %s",
-            _pid(), job_id, live_job.next_run_time,
-        )
-    else:
-        logger.error(
-            "[PID %d] ADD JOB failed to appear in live scheduler: %s",
-            _pid(), job_id,
-        )
-    _jobs_meta[job_id] = {"config": config, "email": email, "schedule": schedule, "token": token}
-    pg_save_job(job_id, config, schedule, email, token)
+    next_run = str(live_job.next_run_time) if live_job else None
+    logger.info(
+        "[PID %d] ACTIVATED: %s | next run: %s",
+        _pid(), job_id, next_run,
+    )
+
+    _jobs_meta[job_id] = {
+        "config":   config,
+        "email":    email,
+        "schedule": schedule,
+        "token":    token,
+    }
+    return next_run
 
 
 def get_stored_token(job_id: str):
-    """Return the stored token for a job, or None if the job doesn't exist."""
+    """Return the stored token for a job (confirmed or pending), or None."""
     meta = _jobs_meta.get(job_id)
-    return meta["token"] if meta else None
+    if meta:
+        return meta["token"]
+    # Fall back to DB lookup for pending jobs not yet in _jobs_meta
+    return pg_get_token_for_job(job_id)
 
 
 def get_job_meta(job_id: str):
-    """Return the full meta dict for a job, or None if it doesn't exist."""
-    return _jobs_meta.get(job_id)
+    """Return the full meta dict for a job (confirmed or pending), or None."""
+    meta = _jobs_meta.get(job_id)
+    if meta:
+        return meta
+    # Fall back to DB for pending jobs
+    return pg_get_job(job_id)
 
 
 def remove_job(job_id: str) -> bool:

@@ -68,6 +68,32 @@ export async function addSchedule(payload) {
   return data
 }
 
+export async function confirmSchedule(confirmToken) {
+  const res = await http.get('/schedule/confirm', { params: { ct: confirmToken } })
+  const data = res.data
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+export async function getPendingSchedules() {
+  const tokens = getAllTokens()
+  if (tokens.length === 0) return []
+  const res = await http.get('/schedule/pending', {
+    headers: { 'X-Schedule-Token': tokens.join(',') },
+  })
+  return unwrap(res).jobs
+}
+
+export async function resendConfirmation(jobId) {
+  const token = getToken(jobId)
+  if (!token) throw new Error('No token found for this job')
+  const res = await http.post('/schedule/resend-confirmation',
+    { job_id: jobId },
+    { headers: { 'X-Schedule-Token': token } },
+  )
+  return unwrap(res)
+}
+
 export async function getSchedules() {
   const tokens = getAllTokens()
   if (tokens.length === 0) return []

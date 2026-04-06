@@ -3,7 +3,8 @@ import { Clock, ChevronRight, CalendarCheck, X } from 'lucide-react'
 import AssetSelector from './components/AssetSelector'
 import Dashboard from './components/Dashboard'
 import ScheduleManager from './components/ScheduleManager'
-import { runPipeline, getPreviousRuns, listReports } from './api/client'
+import { runPipeline, getPreviousRuns, listReports, confirmSchedule } from './api/client'
+import { saveToken } from './utils/tokenStore'
 import './App.css'
 
 // ── Custom logo icon ───────────────────────────────────────────────────────
@@ -252,12 +253,34 @@ function LoadingOverlay({ message }) {
 // ── App ────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const [view,         setView]         = useState('idle')
-  const [result,       setResult]       = useState(null)
-  const [error,        setError]        = useState(null)
-  const [loadingMsg,   setLoadingMsg]   = useState('')
-  const [showRuns,     setShowRuns]     = useState(false)
-  const [showSchedule, setShowSchedule] = useState(false)
+  const [view,          setView]          = useState('idle')
+  const [result,        setResult]        = useState(null)
+  const [error,         setError]         = useState(null)
+  const [loadingMsg,    setLoadingMsg]    = useState('')
+  const [showRuns,      setShowRuns]      = useState(false)
+  const [showSchedule,  setShowSchedule]  = useState(false)
+  const [confirmResult, setConfirmResult] = useState(null)  // {success, symbol, message}
+
+  // Handle /confirm?ct=... links clicked from confirmation emails
+  useEffect(() => {
+    if (window.location.pathname === '/confirm') {
+      const params = new URLSearchParams(window.location.search)
+      const ct = params.get('ct')
+      if (ct) {
+        confirmSchedule(ct)
+          .then(res => {
+            if (res.job_id && res.token) saveToken(res.job_id, res.token)
+            setConfirmResult({ success: true, symbol: res.symbol, message: res.message })
+          })
+          .catch(err => {
+            setConfirmResult({ success: false, message: err.message || 'Confirmation failed.' })
+          })
+          .finally(() => {
+            window.history.replaceState({}, '', '/')
+          })
+      }
+    }
+  }, [])
 
   async function handleSubmit(config) {
     setError(null)
@@ -361,6 +384,33 @@ export default function App() {
           </nav>
         </div>
       </header>
+
+      {/* ── Confirmation Banner ────────────────────────────────────────── */}
+      {confirmResult && (
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 24px 0' }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px', borderRadius: 'var(--r-md)',
+            background: confirmResult.success ? 'var(--positive-dim)' : 'var(--negative-dim)',
+            border: `1px solid ${confirmResult.success ? 'rgba(43,196,138,0.3)' : 'rgba(240,100,112,0.25)'}`,
+            fontSize: '13px',
+            color: confirmResult.success ? 'var(--positive)' : 'var(--negative)',
+          }}>
+            <span>
+              {confirmResult.success
+                ? `Your ${confirmResult.symbol} scheduled report has been activated! You can manage it in Scheduled Reports.`
+                : confirmResult.message}
+            </span>
+            <button
+              onClick={() => setConfirmResult(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, lineHeight: 1, color: 'inherit' }}
+              aria-label="Dismiss"
+            >
+              <X size={15} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Error Banner ───────────────────────────────────────────────── */}
       {error && (

@@ -1,28 +1,34 @@
 import { useEffect, useState, useRef } from 'react'
-import { X, CalendarCheck, Trash2, Send } from 'lucide-react'
-import { getSchedules, removeSchedule, sendNow } from '../api/client'
+import { X, CalendarCheck, Trash2, Send, Clock, RefreshCw } from 'lucide-react'
+import { getSchedules, removeSchedule, sendNow, getPendingSchedules, resendConfirmation } from '../api/client'
 import { hasAnyTokens } from '../utils/tokenStore'
 
 export default function ScheduleManager({ onClose }) {
-  const [jobs,        setJobs]        = useState(null)
-  const [loading,     setLoading]     = useState(true)
-  const [error,       setError]       = useState(null)
-  const [removing,    setRemoving]    = useState(null)
-  const [sending,     setSending]     = useState(null)     // job_id being sent
-  const [rowErrors,   setRowErrors]   = useState({})       // job_id → error message
-  const [rowMessages, setRowMessages] = useState({})       // job_id → success message
+  const [jobs,         setJobs]         = useState(null)
+  const [pendingJobs,  setPendingJobs]  = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState(null)
+  const [removing,     setRemoving]     = useState(null)
+  const [sending,      setSending]      = useState(null)
+  const [resending,    setResending]    = useState(null)   // job_id being resent
+  const [rowErrors,    setRowErrors]    = useState({})
+  const [rowMessages,  setRowMessages]  = useState({})
   const dismissTimers = useRef({})
 
   function load() {
     if (!hasAnyTokens()) {
       setLoading(false)
       setJobs([])
+      setPendingJobs([])
       return
     }
     setLoading(true)
     setError(null)
-    getSchedules()
-      .then(setJobs)
+    Promise.all([getSchedules(), getPendingSchedules()])
+      .then(([confirmed, pending]) => {
+        setJobs(confirmed)
+        setPendingJobs(pending)
+      })
       .catch(err => setError(err.message))
       .finally(() => setLoading(false))
   }
@@ -62,6 +68,24 @@ export default function ScheduleManager({ onClose }) {
       setRowErrors(prev => ({ ...prev, [job.job_id]: err.message }))
     } finally {
       setSending(null)
+    }
+  }
+
+  async function handleResend(job) {
+    setResending(job.job_id)
+    setRowErrors(prev  => { const n = { ...prev };  delete n[job.job_id]; return n })
+    setRowMessages(prev => { const n = { ...prev }; delete n[job.job_id]; return n })
+    try {
+      await resendConfirmation(job.job_id)
+      setRowMessages(prev => ({ ...prev, [job.job_id]: `Confirmation resent to ${job.email}` }))
+      clearTimeout(dismissTimers.current[job.job_id])
+      dismissTimers.current[job.job_id] = setTimeout(() => {
+        setRowMessages(prev => { const n = { ...prev }; delete n[job.job_id]; return n })
+      }, 8000)
+    } catch (err) {
+      setRowErrors(prev => ({ ...prev, [job.job_id]: err.message }))
+    } finally {
+      setResending(null)
     }
   }
 
@@ -285,6 +309,73 @@ export default function ScheduleManager({ onClose }) {
                 ))}
               </tbody>
             </table>
+          )}
+          {/* ── Pending / awaiting confirmation ─────────────────────── */}
+          {pendingJobs.length > 0 && (
+            <div style={{ marginTop: jobs?.length > 0 ? 24 : 0 }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
+              }}>
+                <Clock size={13} color="var(--text-3)" />
+                <span style={{ fontSize: '11px', fontWeight: 600, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--text-3)', fontFamily: 'var(--font-body)' }}>
+                  Awaiting Confirmation
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {pendingJobs.map(job => (
+                  <div key={job.job_id} style={{
+                    background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--r-md)', padding: '12px 14px',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 500, fontSize: '13px', color: 'var(--text-1)' }}>
+                            {job.symbol}
+                          </span>
+                          <span className="fp-badge fp-badge-neutral" style={{ fontSize: '10px' }}>
+                            {job.frequency}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 3 }}>
+                          {String(job.hour).padStart(2, '0')}:{String(job.minute).padStart(2, '0')} London · {job.email}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: 2 }}>
+                          Check your inbox and click the link to activate.
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleResend(job)}
+                        disabled={resending === job.job_id}
+                        className="fp-btn-ghost"
+                        style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
+                        title="Resend confirmation email"
+                      >
+                        {resending === job.job_id ? (
+                          <svg className="fp-spinner" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <circle cx="6" cy="6" r="4.5" stroke="var(--border-bright)" strokeWidth="1.5" />
+                            <path d="M6 1.5a4.5 4.5 0 0 1 4.5 4.5" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <RefreshCw size={11} />
+                        )}
+                        Resend
+                      </button>
+                    </div>
+                    {rowMessages[job.job_id] && (
+                      <div style={{ fontSize: '11px', color: 'var(--positive)', marginTop: 6 }}>
+                        {rowMessages[job.job_id]}
+                      </div>
+                    )}
+                    {rowErrors[job.job_id] && (
+                      <div style={{ fontSize: '11px', color: 'var(--negative)', marginTop: 6 }}>
+                        {rowErrors[job.job_id]}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
