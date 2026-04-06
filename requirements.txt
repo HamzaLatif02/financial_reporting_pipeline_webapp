@@ -1,3 +1,4 @@
+anthropic
 APScheduler==3.11.2
 eventlet
 pytz

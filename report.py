@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import date
 from pathlib import Path
 from typing import Optional
@@ -10,6 +11,7 @@ import charts
 import cleaner
 import explorer
 import fetcher
+from chart_analyst import analyse_chart
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -488,7 +490,7 @@ class FinancialReport(FPDF):
 
     # -- Chart pages ----------------------------------------------------------
 
-    def charts_pages(self, chart_paths: list):
+    def charts_pages(self, chart_paths: list, analysis: dict):
         path_map = {}
         for p in chart_paths:
             stem = Path(p).stem
@@ -496,6 +498,8 @@ class FinancialReport(FPDF):
                 if stem.endswith(key):
                     path_map[key] = p
                     break
+
+        summary_stats = analysis.get("summary_stats") or {}
 
         for key in _CHART_ORDER:
             p = path_map.get(key)
@@ -521,14 +525,35 @@ class FinancialReport(FPDF):
             self.set_text_color(*C_TEXT_1)
             self.cell(USABLE_W - 8, 5, caption)
 
-            # Chart image — fit usable width, preserve aspect
+            # Chart image — fit to 60% of available height, preserve aspect
             img_y = 16 + header_h + 4
-            max_h = PAGE_H - img_y - 14  # leave footer room
-            self.image(p, x=MARGIN, y=img_y, w=USABLE_W, h=0)
+            img_h = (PAGE_H - img_y - 14) * 0.60
+            self.image(p, x=MARGIN, y=img_y, w=USABLE_W, h=img_h)
 
             # Subtle border around the image area
             self.set_draw_color(*C_BORDER_S)
-            self.rect(MARGIN, img_y, USABLE_W, max_h, style="D")
+            self.rect(MARGIN, img_y, USABLE_W, img_h, style="D")
+
+            # AI Analysis section (skipped for the stats table)
+            if key != "summary_stats_table":
+                description = analyse_chart(
+                    chart_type=key,
+                    symbol=self.config["symbol"],
+                    name=self.config["name"],
+                    summary_stats=summary_stats,
+                )
+                text_y = img_y + img_h + 5
+                self.set_xy(MARGIN, text_y)
+                # "AI Analysis" label
+                self.set_font("Helvetica", "B", 9)
+                self.set_text_color(37, 99, 235)
+                self.cell(0, 5, "AI Analysis", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+                # Description text
+                self.set_font("Helvetica", "I", 10)
+                self.set_text_color(80, 80, 80)
+                self.ln(2)
+                self.set_x(MARGIN)
+                self.multi_cell(USABLE_W, 6, description)
 
     # -- Disclaimer page ------------------------------------------------------
 
@@ -586,7 +611,7 @@ def generate_report(config: dict, analysis: dict, chart_paths: list) -> str:
     pdf.title_page(analysis)
     pdf.metrics_page(analysis)
     pdf.asset_info_page(analysis)
-    pdf.charts_pages(chart_paths)
+    pdf.charts_pages(chart_paths, analysis)
     pdf.disclaimer_page()
 
     pdf.output(str(out_path))
