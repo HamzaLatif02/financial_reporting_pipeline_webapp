@@ -54,6 +54,10 @@ export function getPdfUrl(symbol) {
   return `/api/reports/pdf/${symbol}`
 }
 
+export function getViewUrl(symbol) {
+  return `/api/reports/view/${symbol}`
+}
+
 export async function listReports(symbol) {
   const res = await http.get(`/reports/list/${symbol}`)
   return unwrap(res)

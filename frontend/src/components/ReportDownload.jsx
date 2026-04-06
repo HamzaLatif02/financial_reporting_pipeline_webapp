@@ -1,5 +1,5 @@
-import { Download, FileText } from 'lucide-react'
-import { getPdfUrl } from '../api/client'
+import { Download, Eye, FileText } from 'lucide-react'
+import { getPdfUrl, getViewUrl } from '../api/client'
 
 export default function ReportDownload({ symbol, name, hasPdf }) {
   if (!hasPdf) {
@@ -52,15 +52,27 @@ export default function ReportDownload({ symbol, name, hasPdf }) {
         </div>
       </div>
 
-      <a
-        href={getPdfUrl(symbol)}
-        download={filename}
-        className="fp-btn-accent"
-        style={{ padding: '10px 20px', textDecoration: 'none', flexShrink: 0 }}
-      >
-        <Download size={15} />
-        Download PDF
-      </a>
+      <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+        <a
+          href={getViewUrl(symbol)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="fp-btn-primary"
+          style={{ padding: '10px 18px', textDecoration: 'none' }}
+        >
+          <Eye size={15} />
+          View
+        </a>
+        <a
+          href={getPdfUrl(symbol)}
+          download={filename}
+          className="fp-btn-accent"
+          style={{ padding: '10px 18px', textDecoration: 'none' }}
+        >
+          <Download size={15} />
+          Download
+        </a>
+      </div>
     </div>
   )
 }

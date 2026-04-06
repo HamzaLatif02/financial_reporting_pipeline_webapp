@@ -32,6 +32,18 @@ def serve_pdf(symbol: str):
     return send_from_directory(str(data_dir.resolve()), filename, as_attachment=True)
 
 
+@reports_bp.get("/view/<symbol>")
+def view_report(symbol: str):
+    filename = f"{symbol}_report.pdf"
+    data_dir = Path(_DATA_DIR)
+    if not (data_dir / filename).is_file():
+        return jsonify({"error": f"PDF report for '{symbol}' not found"}), 404
+    return send_from_directory(
+        str(data_dir.resolve()), filename,
+        mimetype="application/pdf", as_attachment=False,
+    )
+
+
 @reports_bp.get("/list/<symbol>")
 def list_reports(symbol: str):
     try:
