@@ -23,6 +23,23 @@ CHART_CONTEXTS = {
 # report is regenerated (e.g. Send Now triggered twice in a session).
 _cache: dict = {}
 
+_UNICODE_REPLACEMENTS = {
+    "\u2014": "-",    # em dash
+    "\u2013": "-",    # en dash
+    "\u2018": "'",    # left single quote
+    "\u2019": "'",    # right single quote
+    "\u201c": '"',    # left double quote
+    "\u201d": '"',    # right double quote
+    "\u2026": "...",  # ellipsis
+    "\u00a0": " ",    # non-breaking space
+}
+
+
+def _sanitise(text: str) -> str:
+    for char, replacement in _UNICODE_REPLACEMENTS.items():
+        text = text.replace(char, replacement)
+    return text
+
 
 def analyse_chart(chart_type: str, symbol: str, name: str, summary_stats: dict) -> str:
     """Return a 2-3 sentence AI description for a chart.
@@ -72,7 +89,7 @@ def analyse_chart(chart_type: str, symbol: str, name: str, summary_stats: dict) 
                 ),
             }],
         )
-        result = message.content[0].text
+        result = _sanitise(message.content[0].text.strip())
         logger.info("AI analysis generated for %s / %s", symbol, chart_type)
     except Exception as exc:
         logger.warning("Anthropic API failed for %s/%s: %s. Using fallback.", symbol, chart_type, exc)

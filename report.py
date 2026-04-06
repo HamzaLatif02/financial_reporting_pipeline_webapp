@@ -6,6 +6,8 @@ from typing import Optional
 
 from fpdf import FPDF, XPos, YPos
 
+FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+
 import analysis as ana
 import charts
 import cleaner
@@ -128,6 +130,9 @@ class FinancialReport(FPDF):
     def __init__(self, config: dict):
         super().__init__()
         self.config = config
+        self.add_font("DejaVu",      fname=os.path.join(FONTS_DIR, "DejaVuSans.ttf"),         uni=True)
+        self.add_font("DejaVu", "B", fname=os.path.join(FONTS_DIR, "DejaVuSans-Bold.ttf"),    uni=True)
+        self.add_font("DejaVu", "I", fname=os.path.join(FONTS_DIR, "DejaVuSans-Oblique.ttf"), uni=True)
         self.set_auto_page_break(auto=False)
         self.set_margins(MARGIN, MARGIN, MARGIN)
 
@@ -145,10 +150,10 @@ class FinancialReport(FPDF):
         self.rect(0, 11.5, PAGE_W, 0.5, style="F")
         # App name (left) + asset symbol (right)
         self.set_xy(MARGIN, 3)
-        self.set_font("Helvetica", "B", 7)
+        self.set_font("DejaVu", "B", 7)
         self.set_text_color(*C_ACCENT)
         self.cell(USABLE_W / 2, 6, "FINPIPE  /  AUTOMATED FINANCIAL REPORT", align="L")
-        self.set_font("Helvetica", "B", 7)
+        self.set_font("DejaVu", "B", 7)
         self.set_text_color(*C_TEXT_3)
         self.set_xy(MARGIN, 3)
         self.cell(USABLE_W, 6,
@@ -165,7 +170,7 @@ class FinancialReport(FPDF):
         self.set_fill_color(*C_BORDER_S)
         self.rect(0, PAGE_H - 11, PAGE_W, 0.4, style="F")
         self.set_xy(MARGIN, y)
-        self.set_font("Helvetica", "I", 7)
+        self.set_font("DejaVu", "I", 7)
         self.set_text_color(*C_TEXT_3)
         self.cell(USABLE_W / 2, 5, f"Page {self.page_no()}", align="L")
         self.cell(USABLE_W / 2, 5, "Data: Yahoo Finance via yfinance", align="R")
@@ -193,7 +198,7 @@ class FinancialReport(FPDF):
         self.set_fill_color(*C_ACCENT)
         self.rect(MARGIN, y, 2.5, 6, style="F")
         # Label text
-        self.set_font("Helvetica", "B", 9)
+        self.set_font("DejaVu", "B", 9)
         self.set_text_color(*C_ACCENT)
         self.set_xy(MARGIN + 6, y)
         self.cell(USABLE_W - 6, 6, text.upper(), align="L",
@@ -205,7 +210,7 @@ class FinancialReport(FPDF):
     def _badge(self, x: float, y: float, text: str, bg: tuple, fg: tuple,
                h: float = 5.5, pad: float = 6) -> float:
         """Draw a badge, returns its width."""
-        self.set_font("Helvetica", "B", 7)
+        self.set_font("DejaVu", "B", 7)
         w = self.get_string_width(text) + pad * 2
         # Background rect
         self.set_fill_color(*bg)
@@ -245,20 +250,20 @@ class FinancialReport(FPDF):
 
         # Finpipe wordmark
         self.set_xy(0, 14)
-        self.set_font("Helvetica", "B", 8)
+        self.set_font("DejaVu", "B", 8)
         self.set_text_color(*C_ACCENT)
         self.cell(PAGE_W, 5, "FINPIPE", align="C",
                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Divider dot
-        self.set_font("Helvetica", "", 7)
+        self.set_font("DejaVu", "", 7)
         self.set_text_color(*C_TEXT_4)
         self.cell(PAGE_W, 4, "·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·  ·",
                   align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
         # Asset name — large
         self.ln(5)
-        self.set_font("Helvetica", "B", 24)
+        self.set_font("DejaVu", "B", 24)
         self.set_text_color(*C_TEXT_1)
         self.cell(PAGE_W, 12, cfg["name"], align="C",
                   new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -280,7 +285,7 @@ class FinancialReport(FPDF):
 
         # Currency / period / interval line
         self.set_xy(0, y_badges + 10)
-        self.set_font("Helvetica", "", 8)
+        self.set_font("DejaVu", "", 8)
         self.set_text_color(*C_TEXT_3)
         details = (
             f"Currency: {cfg.get('currency', 'N/A')}     "
@@ -292,7 +297,7 @@ class FinancialReport(FPDF):
 
         # Date generated
         self.ln(3)
-        self.set_font("Helvetica", "I", 7)
+        self.set_font("DejaVu", "I", 7)
         self.set_text_color(*C_TEXT_4)
         self.cell(PAGE_W, 4, f"Generated  {date.today().strftime('%B %d, %Y')}",
                   align="C", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -307,11 +312,11 @@ class FinancialReport(FPDF):
             ret_color  = C_POSITIVE if ret >= 0 else C_NEGATIVE
             ret_label  = f"{ret:+.2f}%"
             self.set_xy(0, strip_y)
-            self.set_font("Helvetica", "B", 28)
+            self.set_font("DejaVu", "B", 28)
             self.set_text_color(*ret_color)
             self.cell(PAGE_W, 14, ret_label, align="C",
                       new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            self.set_font("Helvetica", "", 8)
+            self.set_font("DejaVu", "", 8)
             self.set_text_color(*C_TEXT_3)
             self.cell(PAGE_W, 5, "PERIOD TOTAL RETURN", align="C",
                       new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -319,7 +324,7 @@ class FinancialReport(FPDF):
         # Dates bar
         if stats.get("start_date") and stats.get("end_date"):
             self.ln(3)
-            self.set_font("Helvetica", "", 8)
+            self.set_font("DejaVu", "", 8)
             self.set_text_color(*C_TEXT_2)
             self.cell(PAGE_W, 5,
                       f"{stats['start_date']}  to  {stats['end_date']}",
@@ -349,7 +354,7 @@ class FinancialReport(FPDF):
 
             # Card label
             self.set_xy(cx + 5, cy + 4)
-            self.set_font("Helvetica", "", 7)
+            self.set_font("DejaVu", "", 7)
             self.set_text_color(*C_TEXT_3)
             self.cell(col_w - 12, 4, label.upper())
 
@@ -366,7 +371,7 @@ class FinancialReport(FPDF):
         self.set_xy(MARGIN, PAGE_H - 20)
         self._accent_divider(color=C_BORDER_S)
         self.ln(4)
-        self.set_font("Helvetica", "I", 7)
+        self.set_font("DejaVu", "I", 7)
         self.set_text_color(*C_TEXT_4)
         self.cell(USABLE_W, 4,
                   "This report is for informational purposes only and does not constitute financial advice.",
@@ -425,7 +430,7 @@ class FinancialReport(FPDF):
 
             # Label
             self.set_xy(cx + 6, cy + 3)
-            self.set_font("Helvetica", "", 7)
+            self.set_font("DejaVu", "", 7)
             self.set_text_color(*C_TEXT_3)
             self.cell(inner_w - 8, 3.5, label.upper())
 
@@ -478,13 +483,13 @@ class FinancialReport(FPDF):
 
             # Label
             self.set_xy(cx + 6, cy + 3)
-            self.set_font("Helvetica", "", 7)
+            self.set_font("DejaVu", "", 7)
             self.set_text_color(*C_TEXT_3)
             self.cell(inner_w - 8, 3.5, label.upper())
 
             # Value
             self.set_xy(cx + 6, cy + 7.5)
-            self.set_font("Helvetica", "B", 10)
+            self.set_font("DejaVu", "B", 10)
             self.set_text_color(*C_TEXT_1)
             self.cell(inner_w - 8, 5, str(value))
 
@@ -521,7 +526,7 @@ class FinancialReport(FPDF):
 
             # Caption text
             self.set_xy(MARGIN + 8, 16 + (header_h - 5) / 2)
-            self.set_font("Helvetica", "B", 9)
+            self.set_font("DejaVu", "B", 9)
             self.set_text_color(*C_TEXT_1)
             self.cell(USABLE_W - 8, 5, caption)
 
@@ -545,11 +550,11 @@ class FinancialReport(FPDF):
                 text_y = img_y + img_h + 5
                 self.set_xy(MARGIN, text_y)
                 # "AI Analysis" label
-                self.set_font("Helvetica", "B", 9)
+                self.set_font("DejaVu", "B", 9)
                 self.set_text_color(37, 99, 235)
                 self.cell(0, 5, "AI Analysis", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
                 # Description text
-                self.set_font("Helvetica", "I", 10)
+                self.set_font("DejaVu", "I", 10)
                 self.set_text_color(80, 80, 80)
                 self.ln(2)
                 self.set_x(MARGIN)
@@ -563,7 +568,7 @@ class FinancialReport(FPDF):
         self.set_y(16)
         self._section_heading("Disclaimer")
 
-        self.set_font("Helvetica", "", 9)
+        self.set_font("DejaVu", "", 9)
         self.set_text_color(*C_TEXT_2)
         text = (
             "This report is generated automatically from Yahoo Finance data via the yfinance library "
@@ -588,11 +593,11 @@ class FinancialReport(FPDF):
         self.set_fill_color(*C_ACCENT)
         self.rect(bx, by, 2, bh, style="F")
         self.set_xy(bx + 8, by + 3)
-        self.set_font("Helvetica", "B", 8)
+        self.set_font("DejaVu", "B", 8)
         self.set_text_color(*C_ACCENT)
         self.cell(bw - 12, 4, "NOT FINANCIAL ADVICE")
         self.set_xy(bx + 8, by + 8)
-        self.set_font("Helvetica", "", 7.5)
+        self.set_font("DejaVu", "", 7.5)
         self.set_text_color(*C_TEXT_3)
         self.cell(bw - 12, 4,
                   "For personal research and tracking only. Always consult a qualified financial advisor.")
