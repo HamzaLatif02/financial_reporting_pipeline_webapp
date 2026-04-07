@@ -19,11 +19,48 @@ def fetch_data(config: dict) -> dict:
     Saves raw outputs to data/raw/ and returns:
         {"prices": pd.DataFrame, "info": dict}
     """
-    symbol = config["symbol"]
-    ticker = yf.Ticker(symbol)
+    from datetime import date as _date, datetime as _datetime
+
+    symbol   = config["symbol"]
+    interval = config["interval"]
+    ticker   = yf.Ticker(symbol)
 
     # --- Price history ---
-    df = ticker.history(period=config["period"], interval=config["interval"])
+    if config.get("period") == "custom":
+        start = config.get("start_date")
+        end   = config.get("end_date")
+
+        if not start or not end:
+            raise ValueError(
+                "start_date and end_date are required when period is 'custom'"
+            )
+        today = _date.today().isoformat()
+        if end > today:
+            raise ValueError("End date cannot be in the future")
+        if start >= end:
+            raise ValueError("start_date must be before end_date")
+
+        delta_days = (_datetime.fromisoformat(end) - _datetime.fromisoformat(start)).days
+        if delta_days < 7:
+            raise ValueError("Date range must be at least 7 days")
+
+        if interval == "1wk" and delta_days < 28:
+            logger.warning(
+                "Weekly interval with less than 4 weeks of data for %s", symbol
+            )
+        if interval == "1mo" and delta_days < 90:
+            logger.warning(
+                "Monthly interval with less than 3 months of data for %s", symbol
+            )
+
+        logger.info("Fetching %s: %s to %s (%s)", symbol, start, end, interval)
+        df = ticker.history(start=start, end=end, interval=interval)
+    else:
+        logger.info(
+            "Fetching %s: period=%s (%s)", symbol, config["period"], interval
+        )
+        df = ticker.history(period=config["period"], interval=interval)
+
     df.reset_index(inplace=True)
 
     # Normalise the date column name — yfinance uses "Date" for daily/weekly

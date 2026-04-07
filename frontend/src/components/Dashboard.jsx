@@ -15,12 +15,24 @@ export default function Dashboard({ result, onReset }) {
 
   const name          = asset_info?.longName ?? asset_info?.shortName ?? result.name ?? symbol
   const assetType     = asset_info?.quoteType ?? result.asset_type ?? ''
-  const period        = result.period   ?? ''
-  const interval      = result.interval ?? ''
+  const period        = result.period     ?? ''
+  const interval      = result.interval   ?? ''
+  const startDate     = result.start_date ?? null
+  const endDate       = result.end_date   ?? null
   const intervalLabel = interval === '1d'  ? 'Daily'
                       : interval === '1wk' ? 'Weekly'
                       : interval === '1mo' ? 'Monthly'
                       : interval
+
+  function formatDisplayDate(dateStr) {
+    return new Date(dateStr).toLocaleDateString('en-GB', {
+      day: 'numeric', month: 'short', year: 'numeric',
+    })
+  }
+
+  const periodChip = period === 'custom' && startDate && endDate
+    ? `${formatDisplayDate(startDate)} \u2192 ${formatDisplayDate(endDate)}`
+    : period
 
   const config = {
     symbol,
@@ -29,6 +41,7 @@ export default function Dashboard({ result, onReset }) {
     currency:   asset_info?.currency ?? 'USD',
     period,
     interval,
+    ...(period === 'custom' && startDate && endDate && { start_date: startDate, end_date: endDate }),
   }
 
   useEffect(() => {
@@ -72,14 +85,14 @@ export default function Dashboard({ result, onReset }) {
 
               {/* Period + interval chips row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
-                {period && (
+                {periodChip && (
                   <span style={{
                     fontSize: '11px', fontWeight: 500,
                     background: 'var(--bg-raised)', border: '1px solid var(--border-default)',
                     borderRadius: 'var(--r-full)', padding: '3px 10px',
                     color: 'var(--text-2)', fontFamily: 'var(--font-mono)',
                   }}>
-                    {period}
+                    {periodChip}
                   </span>
                 )}
                 {intervalLabel && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Search, AlertCircle } from 'lucide-react'
 import { getCategories, getPeriods, getIntervals, validateTicker } from '../../api/client'
+import DateRangePicker from '../DateRangePicker'
 
 // ── Single-asset picker panel ─────────────────────────────────────────────────
 
@@ -222,8 +223,11 @@ export default function AssetPairSelector({ onSubmit, isLoading }) {
 
   const [assetA, setAssetA] = useState(null)
   const [assetB, setAssetB] = useState(null)
-  const [period,    setPeriod]   = useState(null)
-  const [interval,  setInterval] = useState(null)
+  const [period,     setPeriod]    = useState(null)
+  const [interval,   setInterval]  = useState(null)
+  const [startDate,  setStartDate] = useState(null)
+  const [endDate,    setEndDate]   = useState(null)
+  const [dateErrors, setDateErrors] = useState({})
 
   function loadData() {
     setFetching(true)
@@ -240,14 +244,45 @@ export default function AssetPairSelector({ onSubmit, isLoading }) {
 
   useEffect(() => { loadData() }, [])
 
+  function validateDates(start, end) {
+    const errors = {}
+    const today  = new Date().toISOString().split('T')[0]
+    if (start && end) {
+      if (start >= end)
+        errors.end = 'End date must be after start date'
+      else if (end > today)
+        errors.end = 'End date cannot be in the future'
+      else {
+        const days = Math.round((new Date(end) - new Date(start)) / 86400000)
+        if (days < 7) errors.end = 'Date range must be at least 7 days'
+      }
+    }
+    setDateErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  useEffect(() => {
+    if (startDate && endDate) validateDates(startDate, endDate)
+  }, [startDate, endDate])
+
+  function handleStartChange(d) { setStartDate(d); if (endDate) validateDates(d, endDate) }
+  function handleEndChange(d)   { setEndDate(d);   if (startDate) validateDates(startDate, d) }
+
+  function handlePeriodChange(val) {
+    setPeriod(val)
+    if (val !== 'custom') { setStartDate(null); setEndDate(null); setDateErrors({}) }
+  }
+
   const sameAsset = assetA && assetB && assetA.symbol === assetB.symbol
-  const canSubmit = assetA && assetB && period && interval && !isLoading && !sameAsset
+  const dateValid = period !== 'custom' || (startDate && endDate && Object.keys(dateErrors).length === 0)
+  const canSubmit = assetA && assetB && period && interval && !isLoading && !sameAsset && dateValid
 
   function handleSubmit() {
     if (!canSubmit) return
+    const dates = period === 'custom' ? { start_date: startDate, end_date: endDate } : {}
     onSubmit(
-      { ...assetA, period, interval },
-      { ...assetB, period, interval },
+      { ...assetA, period, interval, ...dates },
+      { ...assetB, period, interval, ...dates },
     )
   }
 
@@ -327,13 +362,23 @@ export default function AssetPairSelector({ onSubmit, isLoading }) {
             {periods.map(p => (
               <button
                 key={p.value}
-                onClick={() => setPeriod(p.value)}
+                onClick={() => handlePeriodChange(p.value)}
                 className={`fp-pill-btn ${period === p.value ? 'active' : ''}`}
               >
                 {p.label}
               </button>
             ))}
           </div>
+          {period === 'custom' && (
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onStartChange={handleStartChange}
+              onEndChange={handleEndChange}
+              interval={interval}
+              errors={dateErrors}
+            />
+          )}
         </div>
 
         <div>

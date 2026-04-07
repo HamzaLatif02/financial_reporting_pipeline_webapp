@@ -195,7 +195,13 @@ export default function App() {
   // When WebSocket pipeline completes, show dashboard
   useEffect(() => {
     if (!wsResult) return
-    setResult({ ...wsResult, period: pendingConfig?.period, interval: pendingConfig?.interval })
+    setResult({
+      ...wsResult,
+      period:     pendingConfig?.period,
+      interval:   pendingConfig?.interval,
+      start_date: pendingConfig?.start_date ?? null,
+      end_date:   pendingConfig?.end_date   ?? null,
+    })
     setView('done')
   }, [wsResult])
 

@@ -155,9 +155,14 @@ class FinancialReport(FPDF):
         self.cell(USABLE_W / 2, 6, "FINPIPE  /  AUTOMATED FINANCIAL REPORT", align="L")
         self.set_font("DejaVu", "B", 7)
         self.set_text_color(*C_TEXT_3)
+        cfg = self.config
+        if cfg.get("period") == "custom":
+            period_str = f"{cfg.get('start_date', '')} to {cfg.get('end_date', '')}"
+        else:
+            period_str = cfg.get("period", "")
         self.set_xy(MARGIN, 3)
         self.cell(USABLE_W, 6,
-                  f"{self.config['symbol']}  ·  {self.config.get('period', '')}  ·  {self.config.get('interval', '')}",
+                  f"{cfg['symbol']}  ·  {period_str}  ·  {cfg.get('interval', '')}",
                   align="R")
 
     def footer(self):
@@ -287,9 +292,19 @@ class FinancialReport(FPDF):
         self.set_xy(0, y_badges + 10)
         self.set_font("DejaVu", "", 8)
         self.set_text_color(*C_TEXT_3)
+        _period_labels = {
+            "1mo": "1 Month",   "3mo": "3 Months",
+            "6mo": "6 Months",  "1y":  "1 Year",
+            "2y":  "2 Years",   "5y":  "5 Years",
+            "10y": "10 Years",  "max": "Maximum History",
+        }
+        if cfg.get("period") == "custom":
+            period_display = f"{cfg.get('start_date', '')} to {cfg.get('end_date', '')}"
+        else:
+            period_display = _period_labels.get(cfg.get("period", ""), cfg.get("period", ""))
         details = (
             f"Currency: {cfg.get('currency', 'N/A')}     "
-            f"Period: {cfg.get('period', '')}     "
+            f"Period: {period_display}     "
             f"Interval: {cfg.get('interval', '')}"
         )
         self.cell(PAGE_W, 5, details, align="C",

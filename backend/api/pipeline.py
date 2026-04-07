@@ -78,6 +78,17 @@ def run_pipeline():
             "error":  "Invalid symbol. Use 1–20 characters: letters, digits, . - ^ =",
         }), 400
 
+    if config["period"] == "custom":
+        start_date = body.get("start_date", "").strip()
+        end_date   = body.get("end_date", "").strip()
+        if not start_date or not end_date:
+            return jsonify({
+                "status": "error",
+                "error":  "start_date and end_date are required when period is 'custom'",
+            }), 400
+        config["start_date"] = start_date
+        config["end_date"]   = end_date
+
     raw_email = (body.get("email") or "").strip().lower()
     if raw_email and (_ALLOWED_EMAIL and raw_email != _ALLOWED_EMAIL):
         return jsonify({

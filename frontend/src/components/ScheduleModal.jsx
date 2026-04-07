@@ -140,6 +140,25 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
         {/* ── Body ───────────────────────────────────────────────────── */}
         <div style={{ padding: '24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
+          {config?.period === 'custom' && (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 14px',
+              background: 'rgba(245,158,11,0.08)',
+              border: '1px solid rgba(245,158,11,0.25)',
+              borderRadius: 'var(--r-md)',
+              fontSize: '12px', color: '#F59E0B',
+            }}>
+              <span style={{ flexShrink: 0, marginTop: 1 }}>&#9651;</span>
+              <span>
+                This asset was analysed with a custom date range ({config.start_date} to {config.end_date}).
+                Scheduled reports will repeat this exact date range each time.
+                Consider switching to a preset period (e.g. 1 year) for recurring reports
+                so each run covers recent data.
+              </span>
+            </div>
+          )}
+
           {success ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',

@@ -64,14 +64,15 @@ ASSET_CATEGORIES = {
 }
 
 PERIODS = [
-    ("1mo",  "1 month"),
-    ("3mo",  "3 months"),
-    ("6mo",  "6 months"),
-    ("1y",   "1 year"),
-    ("2y",   "2 years"),
-    ("5y",   "5 years"),
-    ("10y",  "10 years"),
-    ("max",  "Maximum available history"),
+    ("1mo",    "1 month"),
+    ("3mo",    "3 months"),
+    ("6mo",    "6 months"),
+    ("1y",     "1 year"),
+    ("2y",     "2 years"),
+    ("5y",     "5 years"),
+    ("10y",    "10 years"),
+    ("max",    "Maximum available history"),
+    ("custom", "Custom date range"),
 ]
 
 INTERVALS = [
@@ -182,13 +183,55 @@ def _prompt_custom_ticker() -> tuple[str, str]:
         print(f"  Could not find '{symbol}' on Yahoo Finance. Please try again.")
 
 
-def _select_period() -> str:
-    """Print the PERIODS list and return the chosen period code."""
+def _prompt_date(prompt: str) -> str:
+    """Prompt until the user enters a valid YYYY-MM-DD date string."""
+    import re as _re
+    from datetime import date as _date, datetime as _dt
+    _date_re = _re.compile(r'^\d{4}-\d{2}-\d{2}$')
+    while True:
+        raw = input(prompt).strip()
+        if not _date_re.match(raw):
+            print("  Please enter a date in YYYY-MM-DD format.")
+            continue
+        try:
+            _dt.strptime(raw, "%Y-%m-%d")
+        except ValueError:
+            print("  That is not a valid calendar date.")
+            continue
+        if raw > _date.today().isoformat():
+            print("  Date cannot be in the future.")
+            continue
+        return raw
+
+
+def _select_period() -> tuple:
+    """Print the PERIODS list and return (period, start_date, end_date).
+
+    start_date and end_date are None for preset periods;
+    non-None strings (YYYY-MM-DD) when period is 'custom'.
+    """
+    from datetime import datetime as _dt
     print("\nAvailable periods:")
     for i, (code, label) in enumerate(PERIODS, 1):
         print(f"  {i}. {label} ({code})")
     choice = _prompt_int("Select a period: ", lo=1, hi=len(PERIODS))
-    return PERIODS[choice - 1][0]
+    period = PERIODS[choice - 1][0]
+
+    if period != "custom":
+        return period, None, None
+
+    # Custom — prompt for dates
+    while True:
+        start = _prompt_date("  Enter start date (YYYY-MM-DD): ")
+        end   = _prompt_date("  Enter end date   (YYYY-MM-DD): ")
+        if start >= end:
+            print("  Start date must be before end date. Please try again.")
+            continue
+        delta = (_dt.fromisoformat(end) - _dt.fromisoformat(start)).days
+        if delta < 7:
+            print("  Date range must be at least 7 days. Please try again.")
+            continue
+        return period, start, end
 
 
 def _select_interval() -> str:
@@ -225,10 +268,11 @@ def interactive_select() -> dict:
 
     symbol, name, asset_type = _select_asset()
 
-    period = _select_period()
+    period, start_date, end_date = _select_period()
     interval = _select_interval()
 
-    _check_period_interval(period, interval)
+    if period != "custom":
+        _check_period_interval(period, interval)
 
     # Fetch currency for the chosen ticker (best-effort)
     info = validate_ticker(symbol)
@@ -242,6 +286,9 @@ def interactive_select() -> dict:
         "period":     period,
         "interval":   interval,
     }
+    if period == "custom":
+        config["start_date"] = start_date
+        config["end_date"]   = end_date
 
     return config
 
