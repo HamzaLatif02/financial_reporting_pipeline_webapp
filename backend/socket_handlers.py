@@ -25,7 +25,10 @@ from progress import emit_progress          # noqa: E402
 
 from fetcher             import fetch_data
 from cleaner             import clean_data
-from db                  import insert_prices, insert_info, init_db
+from db                  import (
+    insert_prices, insert_info, init_db,
+    get_cached_report, save_cached_report,
+)
 from analysis            import run_analysis
 from charts              import generate_charts
 from report              import generate_report
@@ -158,6 +161,35 @@ def on_start_pipeline(data):
 
     symbol = config.get("symbol", "?").strip().upper()
     config["symbol"] = symbol
+    bypass_cache = (data or {}).get("bypass_cache", False)
+
+    # ── Cache check ───────────────────────────────────────────────────────
+    if not bypass_cache:
+        cached = get_cached_report(config)
+        if cached:
+            logger.info("[WS] Cache hit for %s — skipping pipeline", symbol)
+            emit_progress(run_id, "cache", "Loading cached report...", 90)
+            time.sleep(0.4)
+            cached_result = cached["result"]
+            chart_urls = [
+                f"/api/reports/charts/{os.path.basename(p)}"
+                for p in cached["chart_paths"]
+            ]
+            socketio.emit("pipeline_complete", {
+                "run_id":        run_id,
+                "status":        "success",
+                "cache_hit":     True,
+                "cached_at":     cached["cached_at"],
+                "age_minutes":   cached["age_minutes"],
+                "symbol":        symbol,
+                "name":          config.get("name", symbol),
+                "asset_type":    config.get("asset_type", ""),
+                "summary_stats": cached_result.get("summary_stats", {}),
+                "chart_urls":    chart_urls,
+                "latest_value":  cached_result.get("latest_value"),
+                "asset_info":    cached_result.get("asset_info", {}),
+            }, room=run_id)
+            return
 
     def run():
         stop_ka = threading.Event()
@@ -184,22 +216,35 @@ def on_start_pipeline(data):
             chart_paths = generate_charts(config, analysis)
 
             emit_progress(run_id, "report",  "Building PDF report",   85)
-            generate_report(config, analysis, chart_paths)
+            pdf_path = generate_report(config, analysis, chart_paths)
 
             emit_progress(run_id, "complete", "Complete",             100)
 
             raw_info      = analysis.get("asset_info") or {}
             selected_info = {k: raw_info[k] for k in _INFO_FIELDS if raw_info.get(k) is not None}
+            latest_value  = _latest_value(analysis["price_series"])
+
+            # Save to cache
+            try:
+                cache_result = {
+                    "summary_stats": analysis.get("summary_stats") or {},
+                    "latest_value":  latest_value,
+                    "asset_info":    selected_info,
+                }
+                save_cached_report(config, cache_result, chart_paths, pdf_path)
+            except Exception as cache_exc:
+                logger.warning("[WS] Cache save failed for %s: %s", symbol, cache_exc)
 
             socketio.emit("pipeline_complete", {
                 "run_id":        run_id,
                 "status":        "success",
+                "cache_hit":     False,
                 "symbol":        symbol,
                 "name":          config.get("name", symbol),
                 "asset_type":    config.get("asset_type", ""),
                 "summary_stats": analysis.get("summary_stats") or {},
                 "chart_urls":    _chart_urls_for(chart_paths),
-                "latest_value":  _latest_value(analysis["price_series"]),
+                "latest_value":  latest_value,
                 "asset_info":    selected_info,
             }, room=run_id)
 
@@ -234,15 +279,49 @@ def on_start_comparison(data):
         })
         return
 
+    sym_a = config_a.get("symbol", "A").strip().upper()
+    sym_b = config_b.get("symbol", "B").strip().upper()
+    config_a["symbol"] = sym_a
+    config_b["symbol"] = sym_b
+    bypass_cache = (data or {}).get("bypass_cache", False)
+
+    # ── Cache check ───────────────────────────────────────────────────────
+    if not bypass_cache:
+        cmp_cache_config = {
+            "symbol":     f"{sym_a}_vs_{sym_b}",
+            "name":       f"{config_a.get('name', sym_a)} vs {config_b.get('name', sym_b)}",
+            "asset_type": "Comparison",
+            "currency":   config_a.get("currency", ""),
+            "period":     config_a.get("period", ""),
+            "interval":   config_a.get("interval", ""),
+            "start_date": config_a.get("start_date"),
+            "end_date":   config_a.get("end_date"),
+        }
+        cached = get_cached_report(cmp_cache_config)
+        if cached:
+            logger.info("[WS] Cache hit for %s vs %s — skipping comparison", sym_a, sym_b)
+            emit_progress(run_id, "cache", "Loading cached report...", 90)
+            time.sleep(0.4)
+            cached_result = cached["result"]
+            chart_urls = [
+                f"/api/reports/charts/{os.path.basename(p)}"
+                for p in cached["chart_paths"]
+            ]
+            socketio.emit("comparison_complete", {
+                "run_id":       run_id,
+                "status":       "success",
+                "cache_hit":    True,
+                "cached_at":    cached["cached_at"],
+                "age_minutes":  cached["age_minutes"],
+                **cached_result,
+                "chart_urls":   chart_urls,
+            }, room=run_id)
+            return
+
     def run():
         stop_ka = threading.Event()
         _start_keepalive(run_id, stop_ka)
         try:
-            sym_a = config_a.get("symbol", "A").strip().upper()
-            sym_b = config_b.get("symbol", "B").strip().upper()
-            config_a["symbol"] = sym_a
-            config_b["symbol"] = sym_b
-
             emit_progress(run_id, "init",    "Initialising",                 0)
             init_db()
 
@@ -273,9 +352,7 @@ def on_start_comparison(data):
 
             chart_urls = [f"/api/reports/charts/{Path(p).name}" for p in chart_paths]
 
-            socketio.emit("comparison_complete", {
-                "run_id":       run_id,
-                "status":       "success",
+            cmp_response = {
                 "symbol_a":     sym_a,
                 "symbol_b":     sym_b,
                 "name_a":       comparison["name_a"],
@@ -284,9 +361,30 @@ def on_start_comparison(data):
                 "metrics":      comparison["metrics"],
                 "cum_returns":  comparison["cum_returns"],
                 "overlap_days": comparison["overlap_days"],
-                "chart_urls":   chart_urls,
                 "period":       config_a.get("period", ""),
                 "interval":     config_a.get("interval", ""),
+                "pdf_url":      f"/api/comparison/pdf/{sym_a}/{sym_b}",
+            }
+
+            # Save to cache
+            if not bypass_cache:
+                try:
+                    _cmp_pdf = str(
+                        Path(os.path.join(
+                            os.path.abspath(os.path.join(os.path.dirname(__file__), "..")),
+                            "data", f"{sym_a}_vs_{sym_b}_comparison_report.pdf",
+                        ))
+                    )
+                    save_cached_report(cmp_cache_config, cmp_response, chart_paths, _cmp_pdf)
+                except Exception as cache_exc:
+                    logger.warning("[WS] Comparison cache save failed: %s", cache_exc)
+
+            socketio.emit("comparison_complete", {
+                "run_id":    run_id,
+                "status":    "success",
+                "cache_hit": False,
+                **cmp_response,
+                "chart_urls": chart_urls,
             }, room=run_id)
 
         except Exception as exc:

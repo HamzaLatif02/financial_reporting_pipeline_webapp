@@ -1,7 +1,10 @@
+import hashlib
 import json
 import logging
+import os
 import re
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -294,6 +297,181 @@ def delete_scheduled_job(job_id: str) -> bool:
     if deleted:
         logger.info("Deleted scheduled job: %s", job_id)
     return deleted
+
+
+# ---------------------------------------------------------------------------
+# 7. Report cache
+# ---------------------------------------------------------------------------
+
+CACHE_TTL = 3600  # 1 hour in seconds
+
+
+def init_cache_table() -> None:
+    """Create the report_cache table if it does not already exist."""
+    with _connect() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS report_cache (
+                cache_key     TEXT PRIMARY KEY,
+                symbol        TEXT NOT NULL,
+                name          TEXT NOT NULL,
+                asset_type    TEXT NOT NULL,
+                currency      TEXT NOT NULL,
+                period        TEXT NOT NULL,
+                interval_val  TEXT NOT NULL,
+                start_date    TEXT,
+                end_date      TEXT,
+                result_json   TEXT NOT NULL,
+                chart_paths   TEXT NOT NULL,
+                pdf_path      TEXT NOT NULL,
+                created_at    REAL NOT NULL,
+                expires_at    REAL NOT NULL
+            )
+        """)
+        conn.commit()
+    logger.info("Cache table initialised")
+
+
+def _make_cache_key(config: dict) -> str:
+    """Generate a deterministic SHA-256 cache key from the config fields
+    that affect pipeline output: symbol, period, interval, start_date, end_date.
+    """
+    key_parts = {
+        "symbol":     config["symbol"].upper().strip(),
+        "period":     config.get("period", "").lower().strip(),
+        "interval":   config.get("interval", "").lower().strip(),
+        "start_date": config.get("start_date", "") or "",
+        "end_date":   config.get("end_date", "") or "",
+    }
+    key_str = json.dumps(key_parts, sort_keys=True)
+    return hashlib.sha256(key_str.encode()).hexdigest()
+
+
+def get_cached_report(config: dict):
+    """Return cached result data if a valid, unexpired entry exists and all
+    referenced files are present on disk.  Returns None on any miss.
+    """
+    cache_key = _make_cache_key(config)
+    now = time.time()
+
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM report_cache WHERE cache_key = ? AND expires_at > ?",
+            (cache_key, now),
+        ).fetchone()
+
+    if not row:
+        logger.info("Cache miss: %s (no entry or expired)", config["symbol"])
+        return None
+
+    chart_paths = json.loads(row["chart_paths"])
+    pdf_path = row["pdf_path"]
+
+    missing = [p for p in chart_paths + [pdf_path] if not os.path.exists(p)]
+    if missing:
+        logger.warning(
+            "Cache entry exists for %s but %d file(s) are missing — treating as miss",
+            config["symbol"], len(missing),
+        )
+        delete_cached_report(config)
+        return None
+
+    age_minutes = (now - row["created_at"]) / 60
+    logger.info("Cache HIT: %s (cached %.1f minutes ago)", config["symbol"], age_minutes)
+
+    return {
+        "cache_hit":   True,
+        "cached_at":   row["created_at"],
+        "expires_at":  row["expires_at"],
+        "age_minutes": round(age_minutes, 1),
+        "result":      json.loads(row["result_json"]),
+        "chart_paths": chart_paths,
+        "pdf_path":    pdf_path,
+    }
+
+
+def save_cached_report(
+    config: dict,
+    result: dict,
+    chart_paths: list,
+    pdf_path: str,
+) -> None:
+    """Save pipeline results to the cache.
+    Replaces any existing entry for the same cache key.
+
+    `result` should be a JSON-serialisable dict (no DataFrames).
+    """
+    cache_key = _make_cache_key(config)
+    now = time.time()
+
+    with _connect() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO report_cache (
+                cache_key, symbol, name, asset_type, currency,
+                period, interval_val, start_date, end_date,
+                result_json, chart_paths, pdf_path,
+                created_at, expires_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            cache_key,
+            config["symbol"],
+            config.get("name", ""),
+            config.get("asset_type", ""),
+            config.get("currency", ""),
+            config.get("period", ""),
+            config.get("interval", ""),
+            config.get("start_date"),
+            config.get("end_date"),
+            json.dumps(result, default=str),
+            json.dumps(chart_paths),
+            pdf_path,
+            now,
+            now + CACHE_TTL,
+        ))
+        conn.commit()
+    logger.info(
+        "Cache saved: %s (expires in %d minutes)",
+        config["symbol"], CACHE_TTL // 60,
+    )
+
+
+def delete_cached_report(config: dict) -> None:
+    """Delete a specific cache entry by config key."""
+    cache_key = _make_cache_key(config)
+    with _connect() as conn:
+        conn.execute("DELETE FROM report_cache WHERE cache_key = ?", (cache_key,))
+        conn.commit()
+    logger.info("Cache entry deleted: %s", config["symbol"])
+
+
+def purge_expired_cache() -> int:
+    """Delete all expired cache entries.  Returns the count of deleted rows."""
+    now = time.time()
+    with _connect() as conn:
+        cursor = conn.execute(
+            "DELETE FROM report_cache WHERE expires_at <= ?", (now,)
+        )
+        conn.commit()
+        deleted = cursor.rowcount
+    if deleted > 0:
+        logger.info("Cache purged: %d expired entries removed", deleted)
+    return deleted
+
+
+def list_cache_entries() -> list:
+    """Return all active (non-expired) cache entries, newest first."""
+    now = time.time()
+    with _connect() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT symbol, name, period, interval_val,
+                      created_at, expires_at
+               FROM report_cache
+               WHERE expires_at > ?
+               ORDER BY created_at DESC""",
+            (now,),
+        ).fetchall()
+    return [dict(row) for row in rows]
 
 
 # ---------------------------------------------------------------------------

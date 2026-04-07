@@ -55,6 +55,7 @@ export function usePipelineSocket() {
   const [error,               setError]               = useState(null)
   const [usingFallback,       setUsingFallback]       = useState(false)
   const [rateLimitRetryAfter, setRateLimitRetryAfter] = useState(null)
+  const [cacheInfo,           setCacheInfo]           = useState(null)
 
   // Refs that survive across closures and renders
   const socketRef      = useRef(null)
@@ -83,13 +84,15 @@ export function usePipelineSocket() {
 
   // ── HTTP fallback runners ─────────────────────────────────────────────────
 
-  async function httpPipeline(config) {
+  async function httpPipeline(config, bypassCache = false) {
     setUsingFallback(true)
     startFallback(PIPELINE_FALLBACK_STEPS)
     try {
+      const headers = { 'Content-Type': 'application/json' }
+      if (bypassCache) headers['X-Cache-Bypass'] = 'true'
       const res  = await fetch('/api/pipeline/run', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(config),
+        method: 'POST', headers,
+        body: JSON.stringify({ ...config, bypass_cache: bypassCache }),
       })
       const data = await res.json()
       stopFallback()
@@ -108,6 +111,10 @@ export function usePipelineSocket() {
       setProgress({ percent: 100, message: 'Complete' })
       isLoadingRef.current = false
       setIsLoading(false)
+      setCacheInfo(data.cache_hit
+        ? { hit: true, ageMinutes: data.age_minutes, cachedAt: data.cached_at }
+        : { hit: false }
+      )
       setResult(data)
       return data
     } catch (err) {
@@ -185,7 +192,7 @@ export function usePipelineSocket() {
       // Switch to HTTP fallback transparently
       console.warn('[WS] Switching to HTTP fallback after disconnect')
       if (run.type === 'pipeline') {
-        httpPipeline(run.config).then(resolve)
+        httpPipeline(run.config, run.bypassCache).then(resolve)
       } else {
         httpComparison(run.config_a, run.config_b).then(resolve)
       }
@@ -194,15 +201,16 @@ export function usePipelineSocket() {
 
   // ── runPipeline ───────────────────────────────────────────────────────────
 
-  const runPipeline = useCallback(async (config) => {
+  const runPipeline = useCallback(async (config, options = {}) => {
     setIsLoading(true); isLoadingRef.current = true
-    setError(null); setResult(null)
+    setError(null); setResult(null); setCacheInfo(null)
     setProgress({ percent: 0, message: '' })
     setUsingFallback(false)
 
+    const bypassCache = options.bypassCache === true
     const runId = crypto.randomUUID()
     runIdRef.current    = runId
-    pendingRunRef.current = { type: 'pipeline', config }
+    pendingRunRef.current = { type: 'pipeline', config, bypassCache }
 
     let socket = null
     try { socket = await connectSocket(); socketRef.current = socket }
@@ -213,13 +221,13 @@ export function usePipelineSocket() {
         // Register handlers with .off() first to prevent duplicates
         socket.off('joined')
         socket.on('joined', () => {
-          socket.emit('start_pipeline', { run_id: runId, config })
+          socket.emit('start_pipeline', { run_id: runId, config, bypass_cache: bypassCache })
         })
 
         socket.off('pipeline_progress')
         socket.on('pipeline_progress', (data) => {
           if (data.run_id !== runIdRef.current) return
-          setProgress({ percent: data.percent, message: data.message })
+          setProgress({ percent: data.percent, message: data.message, stage: data.stage })
         })
 
         socket.off('ws_ping')
@@ -231,6 +239,10 @@ export function usePipelineSocket() {
           cleanupSocket(socket)
           isLoadingRef.current = false
           setIsLoading(false)
+          setCacheInfo(data.cache_hit
+            ? { hit: true, ageMinutes: data.age_minutes, cachedAt: data.cached_at }
+            : { hit: false }
+          )
           setResult(data)
           resolve(data)
         })
@@ -262,7 +274,7 @@ export function usePipelineSocket() {
     }
 
     // No WebSocket — go straight to HTTP
-    return httpPipeline(config)
+    return httpPipeline(config, bypassCache)
   }, [])
 
   // ── runComparison ─────────────────────────────────────────────────────────
@@ -291,7 +303,7 @@ export function usePipelineSocket() {
         socket.off('pipeline_progress')
         socket.on('pipeline_progress', (data) => {
           if (data.run_id !== runIdRef.current) return
-          setProgress({ percent: data.percent, message: data.message })
+          setProgress({ percent: data.percent, message: data.message, stage: data.stage })
         })
 
         socket.off('ws_ping')
@@ -343,8 +355,9 @@ export function usePipelineSocket() {
     setProgress({ percent: 0, message: '' })
     setUsingFallback(false)
     setRateLimitRetryAfter(null)
+    setCacheInfo(null)
     pendingRunRef.current = null
   }, [])
 
-  return { progress, isLoading, result, error, usingFallback, rateLimitRetryAfter, runPipeline, runComparison, resetResult }
+  return { progress, isLoading, result, error, usingFallback, rateLimitRetryAfter, cacheInfo, runPipeline, runComparison, resetResult }
 }

@@ -189,6 +189,7 @@ export default function App() {
     error:               wsError,
     usingFallback,
     rateLimitRetryAfter: wsRateLimitRetryAfter,
+    cacheInfo:           wsCacheInfo,
     runPipeline:         startPipeline,
     resetResult:         wsReset,
   } = usePipelineSocket()
@@ -396,6 +397,8 @@ export default function App() {
                   percent={progress.percent}
                   usingFallback={usingFallback}
                   title="Analysing..."
+                  stage={progress.stage ?? null}
+                  ageMinutes={progress.ageMinutes ?? null}
                   rateLimitError={wsRateLimitRetryAfter !== null}
                   rateLimitRetryAfter={wsRateLimitRetryAfter}
                 />
@@ -413,7 +416,16 @@ export default function App() {
             )}
 
             {view === 'done' && result && (
-              <Dashboard result={result} onReset={() => { setView('idle'); setResult(null); wsReset() }} />
+              <Dashboard
+                result={result}
+                cacheInfo={wsCacheInfo}
+                onReset={() => { setView('idle'); setResult(null); wsReset() }}
+                onRefresh={(config) => {
+                  setView('loading')
+                  setResult(null)
+                  startPipeline(config, { bypassCache: true })
+                }}
+              />
             )}
           </div>
         )}

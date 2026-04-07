@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, CalendarPlus } from 'lucide-react'
+import { ArrowLeft, CalendarPlus, Zap, RefreshCw } from 'lucide-react'
 import { listReports } from '../api/client'
 import MetricsPanel from './MetricsPanel'
 import ChartViewer from './ChartViewer'
 import ReportDownload from './ReportDownload'
 import ScheduleModal from './ScheduleModal'
 
-export default function Dashboard({ result, onReset }) {
+export default function Dashboard({ result, cacheInfo, onReset, onRefresh }) {
   const [reports,      setReports]      = useState(null)
   const [reportsError, setReportsError] = useState(null)
   const [showSchedule, setShowSchedule] = useState(false)
@@ -83,6 +83,27 @@ export default function Dashboard({ result, onReset }) {
                 )}
               </div>
 
+              {/* Cache badge */}
+              {cacheInfo?.hit && (
+                <div style={{ marginTop: 6 }}>
+                  <span
+                    title="This report was loaded from cache. Click Refresh to fetch fresh data."
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5,
+                      fontSize: '11px', fontWeight: 600,
+                      color: 'var(--positive)',
+                      background: 'var(--positive-dim)',
+                      border: '1px solid rgba(43,196,138,0.25)',
+                      borderRadius: 'var(--r-full)', padding: '3px 9px',
+                      cursor: 'default',
+                    }}
+                  >
+                    <Zap size={11} />
+                    Cached &middot; {cacheInfo.ageMinutes != null ? `${cacheInfo.ageMinutes} min ago` : 'recently'}
+                  </span>
+                </div>
+              )}
+
               {/* Period + interval chips row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
                 {periodChip && (
@@ -133,6 +154,17 @@ export default function Dashboard({ result, onReset }) {
                 <CalendarPlus size={14} />
                 Schedule Report
               </button>
+              {onRefresh && (
+                <button
+                  onClick={() => onRefresh(config)}
+                  className="fp-btn-ghost"
+                  title="Bypass cache and fetch fresh data"
+                  style={{ padding: '8px 16px' }}
+                >
+                  <RefreshCw size={14} />
+                  Refresh
+                </button>
+              )}
               <button
                 onClick={onReset}
                 className="fp-btn-ghost"

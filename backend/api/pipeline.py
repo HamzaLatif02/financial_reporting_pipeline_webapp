@@ -16,7 +16,10 @@ sys.path.insert(0, _ROOT)
 
 from fetcher import fetch_data
 from cleaner import clean_data
-from db import insert_prices, insert_info, init_db, list_assets
+from db import (
+    insert_prices, insert_info, init_db, list_assets,
+    get_cached_report, save_cached_report,
+)
 from analysis import run_analysis
 from charts import generate_charts
 from report import generate_report
@@ -98,6 +101,37 @@ def run_pipeline():
     email = raw_email or None
 
     # ------------------------------------------------------------------ #
+    # Cache check (skip when bypass_cache=true or email delivery)          #
+    # ------------------------------------------------------------------ #
+    bypass_cache = (
+        request.headers.get("X-Cache-Bypass", "").lower() == "true"
+        or body.get("bypass_cache") is True
+    )
+    if not bypass_cache and not email:
+        cached = get_cached_report(config)
+        if cached:
+            logger.info(
+                "Serving cached report for %s (age: %.1f min)",
+                symbol, cached["age_minutes"],
+            )
+            cached_result = cached["result"]
+            chart_urls = [
+                f"/api/reports/charts/{os.path.basename(p)}"
+                for p in cached["chart_paths"]
+            ]
+            return jsonify({
+                "status":        "success",
+                "cache_hit":     True,
+                "cached_at":     cached["cached_at"],
+                "age_minutes":   cached["age_minutes"],
+                "symbol":        symbol,
+                "summary_stats": cached_result.get("summary_stats", {}),
+                "chart_urls":    chart_urls,
+                "latest_value":  cached_result.get("latest_value"),
+                "asset_info":    cached_result.get("asset_info", {}),
+            })
+
+    # ------------------------------------------------------------------ #
     # Stage 1 — init_db                                                    #
     # ------------------------------------------------------------------ #
     try:
@@ -164,7 +198,22 @@ def run_pipeline():
         return jsonify({"status": "error", "stage": "generate_report", "error": str(exc)}), 500
 
     # ------------------------------------------------------------------ #
-    # Stage 7b — email PDF if requested                                    #
+    # Stage 7b — save to cache (skip for email-triggered runs)             #
+    # ------------------------------------------------------------------ #
+    if not email:
+        try:
+            _raw_info = analysis.get("asset_info") or {}
+            cache_result = {
+                "summary_stats": analysis.get("summary_stats") or {},
+                "latest_value":  _latest_value(analysis["price_series"]),
+                "asset_info":    {k: _raw_info[k] for k in _INFO_FIELDS if _raw_info.get(k) is not None},
+            }
+            save_cached_report(config, cache_result, chart_paths, pdf_path)
+        except Exception as exc:
+            logger.warning("Cache save failed for %s: %s", symbol, exc)
+
+    # ------------------------------------------------------------------ #
+    # Stage 7c — email PDF if requested                                    #
     # ------------------------------------------------------------------ #
     if email:
         try:
@@ -201,6 +250,7 @@ def run_pipeline():
 
     return jsonify({
         "status":        "success",
+        "cache_hit":     False,
         "symbol":        symbol,
         "summary_stats": analysis.get("summary_stats") or {},
         "chart_urls":    _chart_urls(chart_paths, symbol),

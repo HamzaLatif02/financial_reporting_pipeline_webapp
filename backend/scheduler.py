@@ -155,6 +155,13 @@ def _keepalive() -> None:
         logger.warning("Keepalive ping failed: %s", exc)
 
 
+def _purge_cache() -> None:
+    """Remove expired report cache entries from SQLite."""
+    from db import purge_expired_cache
+    deleted = purge_expired_cache()
+    logger.info("Scheduled cache purge: %d entries removed", deleted)
+
+
 def _heartbeat() -> None:
     """Log a heartbeat every 5 minutes to confirm the scheduler thread is alive."""
     # Refresh the in-memory job store before counting, so any jobs added
@@ -248,6 +255,14 @@ def start_scheduler() -> None:
         id="__heartbeat__",
         replace_existing=True,
         name="Scheduler heartbeat",
+    )
+    # Cache purge: remove expired entries every hour.
+    _scheduler.add_job(
+        _purge_cache,
+        IntervalTrigger(hours=1, timezone=_TZ),
+        id="__cache_purge__",
+        replace_existing=True,
+        name="Cache purge",
     )
 
     _scheduler.start()

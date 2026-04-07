@@ -15,6 +15,7 @@ from api.pipeline   import pipeline_bp
 from api.reports    import reports_bp
 from api.schedule   import schedule_bp
 from api.comparison import comparison_bp
+from api.cache      import cache_bp
 from extensions     import limiter
 
 load_dotenv()
@@ -53,6 +54,7 @@ app.register_blueprint(pipeline_bp,    url_prefix="/api/pipeline")
 app.register_blueprint(reports_bp,     url_prefix="/api/reports")
 app.register_blueprint(schedule_bp,    url_prefix="/api/schedule")
 app.register_blueprint(comparison_bp,  url_prefix="/api/comparison")
+app.register_blueprint(cache_bp,       url_prefix="/api/cache")
 
 
 @app.errorhandler(429)
@@ -98,6 +100,9 @@ from db import init_db  # noqa: E402
 # against double-start internally (if _scheduler.running: return).
 with app.app_context():
     init_db()
+    from db import init_cache_table, purge_expired_cache  # noqa: E402
+    init_cache_table()
+    purge_expired_cache()
     start_scheduler()
 
 atexit.register(shutdown_scheduler)

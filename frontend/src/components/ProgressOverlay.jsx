@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Zap } from 'lucide-react'
 
 function RateLimitError({ retryAfter }) {
   const [secondsLeft, setSecondsLeft] = useState(retryAfter || null)
@@ -68,17 +69,63 @@ function RateLimitError({ retryAfter }) {
   )
 }
 
+function CacheHitFlash({ ageMinutes }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      minHeight: '60vh',
+      animation: 'fp-fade-in var(--t-base) var(--ease)',
+    }}>
+      <div className="fp-card" style={{
+        padding: '48px 40px', maxWidth: '420px', width: '100%',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20,
+        textAlign: 'center',
+        border: '1px solid rgba(43,196,138,0.35)',
+        background: 'rgba(43,196,138,0.05)',
+      }}>
+        <div style={{
+          width: 52, height: 52, borderRadius: '50%',
+          background: 'var(--positive-dim)', border: '1px solid rgba(43,196,138,0.3)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Zap size={22} color="var(--positive)" />
+        </div>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-display)', fontWeight: 700,
+            fontSize: '16px', color: 'var(--text-1)', marginBottom: 8,
+          }}>
+            Loading from cache
+          </div>
+          <div style={{ fontSize: '13px', color: 'var(--text-2)', lineHeight: 1.6 }}>
+            {ageMinutes != null
+              ? `Report found from ${ageMinutes} minute${ageMinutes !== 1 ? 's' : ''} ago.`
+              : 'Report found in cache.'}{' '}
+            Loading instantly...
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ProgressOverlay({
   message,
   percent = 0,
   usingFallback = false,
   title = 'Analysing...',
   subtitle = null,
+  stage = null,
+  ageMinutes = null,
   rateLimitError = false,
   rateLimitRetryAfter = null,
 }) {
   if (rateLimitError) {
     return <RateLimitError retryAfter={rateLimitRetryAfter} />
+  }
+
+  if (stage === 'cache') {
+    return <CacheHitFlash ageMinutes={ageMinutes} />
   }
 
   return (

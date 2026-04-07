@@ -14,7 +14,10 @@ from comparison_charts   import generate_comparison_charts  # noqa: E402
 from comparison_report   import generate_comparison_report  # noqa: E402
 from fetcher import fetch_data                           # noqa: E402
 from cleaner import clean_data                           # noqa: E402
-from db      import insert_prices, insert_info, init_db  # noqa: E402
+from db      import (                                    # noqa: E402
+    insert_prices, insert_info, init_db,
+    get_cached_report, save_cached_report,
+)
 from extensions import limiter                           # noqa: E402
 
 comparison_bp = Blueprint("comparison", __name__)
@@ -53,6 +56,40 @@ def run():
             "error": "Both assets must use the same period and interval for a meaningful comparison."
         }), 400
 
+    # ------------------------------------------------------------------ #
+    # Cache check                                                          #
+    # ------------------------------------------------------------------ #
+    bypass_cache = (
+        request.headers.get("X-Cache-Bypass", "").lower() == "true"
+        or body.get("bypass_cache") is True
+    )
+    if not bypass_cache:
+        comparison_cache_config = {
+            "symbol":     f"{sym_a}_vs_{sym_b}",
+            "name":       f"{config_a.get('name', sym_a)} vs {config_b.get('name', sym_b)}",
+            "asset_type": "Comparison",
+            "currency":   config_a.get("currency", ""),
+            "period":     config_a.get("period", ""),
+            "interval":   config_a.get("interval", ""),
+            "start_date": config_a.get("start_date"),
+            "end_date":   config_a.get("end_date"),
+        }
+        cached = get_cached_report(comparison_cache_config)
+        if cached:
+            cached_result = cached["result"]
+            chart_urls = [
+                f"/api/reports/charts/{os.path.basename(p)}"
+                for p in cached["chart_paths"]
+            ]
+            return jsonify({
+                **cached_result,
+                "status":      "success",
+                "cache_hit":   True,
+                "cached_at":   cached["cached_at"],
+                "age_minutes": cached["age_minutes"],
+                "chart_urls":  chart_urls,
+            })
+
     stage = "init"
     try:
         stage = "db_init"
@@ -87,15 +124,9 @@ def run():
         return jsonify({"status": "error", "stage": stage, "error": str(exc)}), 500
 
     chart_urls = [f"/api/reports/charts/{Path(p).name}" for p in chart_paths]
+    pdf_path   = str(Path(_DATA_DIR) / f"{sym_a}_vs_{sym_b}_comparison_report.pdf")
 
-    # Strip non-serialisable analysis objects (DataFrames) from the response
-    comparison_safe = {
-        k: v for k, v in comparison.items()
-        if k not in ("analysis_a", "analysis_b")
-    }
-
-    return jsonify({
-        "status":       "success",
+    response_data = {
         "symbol_a":     sym_a,
         "symbol_b":     sym_b,
         "name_a":       comparison["name_a"],
@@ -104,8 +135,21 @@ def run():
         "metrics":      comparison["metrics"],
         "cum_returns":  comparison["cum_returns"],
         "overlap_days": comparison["overlap_days"],
-        "chart_urls":   chart_urls,
         "pdf_url":      f"/api/comparison/pdf/{sym_a}/{sym_b}",
+    }
+
+    # Save to cache
+    if not bypass_cache:
+        try:
+            save_cached_report(comparison_cache_config, response_data, chart_paths, pdf_path)
+        except Exception as exc:
+            logger.warning("Comparison cache save failed: %s", exc)
+
+    return jsonify({
+        "status":    "success",
+        "cache_hit": False,
+        **response_data,
+        "chart_urls": chart_urls,
     })
 
 
