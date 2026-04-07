@@ -9,11 +9,12 @@ from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-from api.assets   import assets_bp
-from api.pipeline import pipeline_bp
-from api.reports  import reports_bp
-from api.schedule import schedule_bp
-from extensions   import limiter
+from api.assets     import assets_bp
+from api.pipeline   import pipeline_bp
+from api.reports    import reports_bp
+from api.schedule   import schedule_bp
+from api.comparison import comparison_bp
+from extensions     import limiter
 
 load_dotenv()
 
@@ -34,10 +35,11 @@ else:
 
 limiter.init_app(app)
 
-app.register_blueprint(assets_bp,   url_prefix="/api/assets")
-app.register_blueprint(pipeline_bp, url_prefix="/api/pipeline")
-app.register_blueprint(reports_bp,  url_prefix="/api/reports")
-app.register_blueprint(schedule_bp, url_prefix="/api/schedule")
+app.register_blueprint(assets_bp,      url_prefix="/api/assets")
+app.register_blueprint(pipeline_bp,    url_prefix="/api/pipeline")
+app.register_blueprint(reports_bp,     url_prefix="/api/reports")
+app.register_blueprint(schedule_bp,    url_prefix="/api/schedule")
+app.register_blueprint(comparison_bp,  url_prefix="/api/comparison")
 
 
 @app.get("/api/health")

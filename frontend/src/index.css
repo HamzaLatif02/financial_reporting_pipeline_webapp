@@ -596,3 +596,11 @@ select.fp-input option {
   animation: fp-spin 0.9s linear infinite;
   flex-shrink: 0;
 }
+
+/* ── Comparison grid — stacks on narrow viewports ── */
+
+@media (max-width: 900px) {
+  .fp-comparison-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

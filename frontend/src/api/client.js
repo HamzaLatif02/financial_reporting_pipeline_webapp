@@ -58,6 +58,24 @@ export function getViewUrl(symbol) {
   return `/api/reports/view/${symbol}`
 }
 
+export async function runComparison(config_a, config_b) {
+  const res = await http.post('/comparison/run', { config_a, config_b })
+  const data = res.data
+  if (data?.status === 'error') {
+    const msg = data.stage ? `[${data.stage}] ${data.error}` : data.error
+    throw new Error(msg)
+  }
+  return data
+}
+
+export function getComparisonViewUrl(symbol_a, symbol_b) {
+  return `/api/comparison/pdf/${symbol_a}/${symbol_b}`
+}
+
+export function getComparisonDownloadUrl(symbol_a, symbol_b) {
+  return `/api/comparison/download/${symbol_a}/${symbol_b}`
+}
+
 export async function listReports(symbol) {
   const res = await http.get(`/reports/list/${symbol}`)
   return unwrap(res)

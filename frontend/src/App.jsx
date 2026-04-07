@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Clock, ChevronRight, CalendarCheck, X } from 'lucide-react'
+import { Clock, ChevronRight, CalendarCheck, X, GitCompare } from 'lucide-react'
 import AssetSelector from './components/AssetSelector'
 import Dashboard from './components/Dashboard'
 import ScheduleManager from './components/ScheduleManager'
+import Compare from './pages/Compare'
 import { runPipeline, getPreviousRuns, listReports, confirmSchedule } from './api/client'
 import { saveToken } from './utils/tokenStore'
 import './App.css'
@@ -253,6 +254,7 @@ function LoadingOverlay({ message }) {
 // ── App ────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const [activePage,    setActivePage]    = useState('home')   // 'home' | 'compare'
   const [view,          setView]          = useState('idle')
   const [result,        setResult]        = useState(null)
   const [error,         setError]         = useState(null)
@@ -345,8 +347,14 @@ export default function App() {
           maxWidth: 1200, margin: '0 auto', padding: '0 24px',
           height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          {/* Logo + brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {/* Logo + brand — clicking returns to home */}
+          <button
+            onClick={() => setActivePage('home')}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            }}
+          >
             <LogoIcon />
             <span style={{
               fontFamily: 'var(--font-display)', fontWeight: 700,
@@ -355,24 +363,23 @@ export default function App() {
             }}>
               Finpipe
             </span>
-            <span style={{
-              height: 16, width: 1, background: 'var(--border-default)',
-              margin: '0 4px',
-              display: 'none', // hidden on small screens, we use inline style
-            }} className="sm-separator" />
-            <span style={{
-              fontSize: '12px', color: 'var(--text-3)',
-              fontFamily: 'var(--font-mono)',
-              letterSpacing: '0.02em',
-            }}
-              className="hidden sm:inline"
-            >
-              Yahoo Finance
-            </span>
-          </div>
+          </button>
 
           {/* Nav actions */}
-          <nav style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              className="fp-nav-btn"
+              onClick={() => setActivePage('compare')}
+              style={{
+                color: activePage === 'compare' ? 'var(--accent)' : undefined,
+                borderBottom: activePage === 'compare' ? '2px solid var(--accent)' : '2px solid transparent',
+                borderRadius: 0,
+                paddingBottom: 2,
+              }}
+            >
+              <GitCompare size={13} />
+              <span className="hidden sm:inline">Compare</span>
+            </button>
             <button className="fp-nav-btn" onClick={() => setShowSchedule(true)}>
               <CalendarCheck size={13} />
               <span className="hidden sm:inline">Scheduled Reports</span>
@@ -426,34 +433,41 @@ export default function App() {
 
       {/* ── Main content ───────────────────────────────────────────────── */}
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px' }}>
-        <div key={view} style={{ animation: 'fp-fade-up 0.28s var(--ease) both' }}>
 
-          {view === 'idle' && (
-            <div style={{ maxWidth: 760, margin: '0 auto' }}>
-              <div style={{ marginBottom: 28 }}>
-                <h1 style={{
-                  fontFamily: 'var(--font-display)', fontWeight: 800,
-                  fontSize: '1.75rem', color: 'var(--text-1)',
-                  margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2,
-                }}>
-                  Run a Financial Analysis
-                </h1>
-                <p style={{ color: 'var(--text-2)', marginTop: 8, fontSize: '14px' }}>
-                  Select an asset, configure the date range, and generate charts and metrics.
-                </p>
+        {activePage === 'compare' ? (
+          <div key="compare" style={{ animation: 'fp-fade-up 0.28s var(--ease) both' }}>
+            <Compare />
+          </div>
+        ) : (
+          <div key={view} style={{ animation: 'fp-fade-up 0.28s var(--ease) both' }}>
+
+            {view === 'idle' && (
+              <div style={{ maxWidth: 760, margin: '0 auto' }}>
+                <div style={{ marginBottom: 28 }}>
+                  <h1 style={{
+                    fontFamily: 'var(--font-display)', fontWeight: 800,
+                    fontSize: '1.75rem', color: 'var(--text-1)',
+                    margin: 0, letterSpacing: '-0.01em', lineHeight: 1.2,
+                  }}>
+                    Run a Financial Analysis
+                  </h1>
+                  <p style={{ color: 'var(--text-2)', marginTop: 8, fontSize: '14px' }}>
+                    Select an asset, configure the date range, and generate charts and metrics.
+                  </p>
+                </div>
+                <div className="fp-card" style={{ padding: '32px 28px' }}>
+                  <AssetSelector onSubmit={handleSubmit} isLoading={false} />
+                </div>
               </div>
-              <div className="fp-card" style={{ padding: '32px 28px' }}>
-                <AssetSelector onSubmit={handleSubmit} isLoading={false} />
-              </div>
-            </div>
-          )}
+            )}
 
-          {view === 'loading' && <LoadingOverlay message={loadingMsg} />}
+            {view === 'loading' && <LoadingOverlay message={loadingMsg} />}
 
-          {view === 'done' && result && (
-            <Dashboard result={result} onReset={() => { setView('idle'); setResult(null) }} />
-          )}
-        </div>
+            {view === 'done' && result && (
+              <Dashboard result={result} onReset={() => { setView('idle'); setResult(null) }} />
+            )}
+          </div>
+        )}
       </main>
 
       {/* ── Modals ─────────────────────────────────────────────────────── */}
