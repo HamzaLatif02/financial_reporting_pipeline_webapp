@@ -218,6 +218,7 @@ export default function AssetSelector({ onSubmit, isLoading }) {
             />
             <input
               type="text"
+              aria-label="Custom ticker symbol"
               placeholder="e.g. TSLA, BTC-USD"
               value={customSymbol}
               onChange={e => { setCustomSymbol(e.target.value); setValidationResult(null) }}

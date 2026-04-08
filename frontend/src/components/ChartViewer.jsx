@@ -22,7 +22,7 @@ function labelFromStem(stem) {
   return stem.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
-function ChartImage({ filename, label }) {
+function ChartImage({ filename, label, eager }) {
   const [loaded,  setLoaded]  = useState(false)
   const [errored, setErrored] = useState(false)
   const url = getChartUrl(filename)
@@ -50,6 +50,7 @@ function ChartImage({ filename, label }) {
       <img
         src={url}
         alt={label}
+        loading={eager ? 'eager' : 'lazy'}
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
         style={{
@@ -107,6 +108,7 @@ export default function ChartViewer({ symbol, charts = [] }) {
           key={activeFilename}
           filename={activeFilename}
           label={labelFromStem(stemFromFilename(activeFilename, symbol))}
+          eager={activeIdx === 0}
         />
       </div>
 

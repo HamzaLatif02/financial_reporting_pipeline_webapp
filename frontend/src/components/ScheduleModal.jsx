@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X, CalendarCheck, CheckCircle } from 'lucide-react'
 import { addSchedule } from '../api/client'
 
@@ -66,6 +66,12 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
   const [submitting, setSubmitting] = useState(false)
   const [error,      setError]      = useState(null)
   const [success,    setSuccess]    = useState(null)
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   const preview = schedulePreview({ symbol, frequency, hour, minute, dayOfWeek, day })
 
@@ -206,6 +212,8 @@ export default function ScheduleModal({ config, symbol, name, onClose }) {
                 <FormLabel>Email Address</FormLabel>
                 <input
                   type="email"
+                  id="schedule-email"
+                  aria-label="Email address for scheduled report delivery"
                   placeholder="you@example.com"
                   value={email}
                   onChange={e => setEmail(e.target.value)}

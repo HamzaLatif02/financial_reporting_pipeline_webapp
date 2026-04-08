@@ -1,0 +1,16 @@
+{
+  "name": "Finpipe — Financial Analysis",
+  "short_name": "Finpipe",
+  "description": "Automated financial analysis and reporting for stocks, ETFs, forex and crypto.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090F",
+  "theme_color": "#07090F",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

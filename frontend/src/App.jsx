@@ -43,6 +43,12 @@ function PreviousRunsModal({ onClose, onSelect }) {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   async function handleSelect(run) {
     setSelecting(run.symbol)
     try {
@@ -299,6 +305,7 @@ export default function App() {
             <button
               className="fp-nav-btn"
               onClick={() => setActivePage('compare')}
+              aria-label="Compare assets"
               style={{
                 color: activePage === 'compare' ? 'var(--accent)' : undefined,
                 borderBottom: activePage === 'compare' ? '2px solid var(--accent)' : '2px solid transparent',
@@ -309,11 +316,11 @@ export default function App() {
               <GitCompare size={13} />
               <span className="hidden sm:inline">Compare</span>
             </button>
-            <button className="fp-nav-btn" onClick={() => setShowSchedule(true)}>
+            <button className="fp-nav-btn" aria-label="Scheduled reports" onClick={() => setShowSchedule(true)}>
               <CalendarCheck size={13} />
               <span className="hidden sm:inline">Scheduled Reports</span>
             </button>
-            <button className="fp-nav-btn" onClick={() => setShowRuns(true)}>
+            <button className="fp-nav-btn" aria-label="Previous runs" onClick={() => setShowRuns(true)}>
               <Clock size={13} />
               <span className="hidden sm:inline">Previous Runs</span>
             </button>

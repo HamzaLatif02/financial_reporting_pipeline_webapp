@@ -15,6 +15,12 @@ export default function ScheduleManager({ onClose }) {
   const [rowMessages,  setRowMessages]  = useState({})
   const dismissTimers = useRef({})
 
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   function load() {
     if (!hasAnyTokens()) {
       setLoading(false)

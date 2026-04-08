@@ -31,6 +31,12 @@ _BUILD_DIR = Path(__file__).parent.parent / "frontend" / "build"
 
 if _IS_PROD:
     app = Flask(__name__, static_folder=str(_BUILD_DIR), static_url_path="/")
+    _allowed_origins = [
+        os.getenv("RENDER_EXTERNAL_URL", "https://finpipe.xyz"),
+        "https://finpipe.xyz",
+        "https://www.finpipe.xyz",
+    ]
+    CORS(app, resources={r"/api/*": {"origins": _allowed_origins}})
     logger.info("Production mode — serving React build from %s", _BUILD_DIR)
 else:
     app = Flask(__name__)
@@ -42,7 +48,7 @@ app.config.update(OPENAPI_CONFIG)
 
 socketio = SocketIO(
     app,
-    cors_allowed_origins="*",
+    cors_allowed_origins=_allowed_origins if _IS_PROD else "*",
     async_mode="eventlet",
     logger=False,
     engineio_logger=False,
