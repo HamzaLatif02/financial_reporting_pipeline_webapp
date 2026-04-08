@@ -85,16 +85,19 @@ function MetricCard({ metricKey, value, animIndex }) {
         {METRIC_LABELS[metricKey]}
       </div>
       <div style={{
-        display: 'inline-block',
+        display: 'block',
         fontFamily: 'var(--font-mono)',
         fontWeight: 500,
-        fontSize: '1.25rem',
+        fontSize: '1.1rem',
         color: numColor,
         lineHeight: 1.2,
         background: numBg,
         padding: numBg !== 'transparent' ? '2px 6px' : '0',
         borderRadius: 'var(--r-sm)',
         letterSpacing: '-0.01em',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap',
       }}>
         {fmtd}
       </div>
@@ -137,9 +140,8 @@ export default function MetricsPanel({ summaryStats = {}, assetInfo = {}, symbol
       {/* ── Metric cards grid ──────────────────────────────────────────── */}
       <div className="fp-metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {METRIC_KEYS.map((key, i) => {
-          const value   = summaryStats[key] ?? null
-          const fmtd    = fmt(value, key)
-          const wide    = key === 'avg_daily_volume' && fmtd.length > 11
+          const value = summaryStats[key] ?? null
+          const wide  = key === 'avg_daily_volume'
           return (
             <div key={key} style={wide ? { gridColumn: '1 / -1' } : {}}>
               <MetricCard metricKey={key} value={value} animIndex={i} />

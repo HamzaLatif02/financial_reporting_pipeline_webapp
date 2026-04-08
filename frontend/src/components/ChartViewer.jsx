@@ -43,7 +43,7 @@ function ChartImage({ filename, label }) {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', overflow: 'hidden' }}>
       {!loaded && (
         <div className="fp-skeleton" style={{ position: 'absolute', inset: 0, minHeight: 280, borderRadius: 'var(--r-lg)' }} />
       )}
@@ -53,7 +53,7 @@ function ChartImage({ filename, label }) {
         onLoad={() => setLoaded(true)}
         onError={() => setErrored(true)}
         style={{
-          width: '100%', borderRadius: 'var(--r-lg)',
+          width: '100%', maxWidth: '100%', borderRadius: 'var(--r-lg)',
           border: '1px solid var(--border-default)',
           display: 'block',
           transition: 'opacity 0.3s ease',
@@ -82,7 +82,7 @@ export default function ChartViewer({ symbol, charts = [] }) {
   const activeUrl      = getChartUrl(activeFilename)
 
   return (
-    <div className="fp-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="fp-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', minWidth: 0, width: '100%' }}>
 
       {/* ── Tab bar ────────────────────────────────────────────────────── */}
       <div className="fp-chart-tabs" style={{ paddingTop: 4, paddingLeft: 4, paddingRight: 4 }}>

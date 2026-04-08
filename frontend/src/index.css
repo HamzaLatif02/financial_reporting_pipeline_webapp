@@ -688,11 +688,6 @@ select.fp-input option {
     grid-column: 1 !important;
   }
 
-  /* ── Metrics grid → single column on very small screens ── */
-  .fp-metrics-grid {
-    grid-template-columns: 1fr !important;
-  }
-
   /* ── Report download row → stack ── */
   .fp-report-row {
     flex-direction: column !important;

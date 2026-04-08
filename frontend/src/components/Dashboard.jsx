@@ -184,7 +184,7 @@ export default function Dashboard({ result, cacheInfo, onReset, onRefresh }) {
         gridTemplateColumns: 'repeat(3, 1fr)',
         gap: 20,
       }} className="dashboard-grid">
-        <div style={{ gridColumn: '1 / 2' }}>
+        <div style={{ gridColumn: '1 / 2', minWidth: 0 }}>
           <MetricsPanel
             summaryStats={summary_stats}
             assetInfo={asset_info}
@@ -192,7 +192,7 @@ export default function Dashboard({ result, cacheInfo, onReset, onRefresh }) {
             name={name}
           />
         </div>
-        <div style={{ gridColumn: '2 / 4' }}>
+        <div style={{ gridColumn: '2 / 4', minWidth: 0 }}>
           {reports === null && !reportsError && (
             <div className="fp-card" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
