@@ -56,7 +56,6 @@ jobs:
             --cov=. \
             --cov-report=xml \
             --cov-report=term-missing \
-            --cov-omit="tests/*,frontend/*,.venv/*" \
             -v
 
       - name: Upload coverage report

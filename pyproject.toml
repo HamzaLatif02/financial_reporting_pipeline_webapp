@@ -13,3 +13,16 @@ exclude = '''
 profile = "black"
 line_length = 100
 skip = [".venv", "frontend"]
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "frontend/*",
+    ".venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]
