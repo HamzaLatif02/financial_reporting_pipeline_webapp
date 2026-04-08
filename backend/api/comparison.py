@@ -3,7 +3,8 @@ import os
 import sys
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request, send_from_directory
+from flask import jsonify, request, send_from_directory
+from flask_smorest import Blueprint
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
@@ -19,8 +20,14 @@ from db      import (                                    # noqa: E402
     get_cached_report, save_cached_report,
 )
 from extensions import limiter                           # noqa: E402
+from schemas import (                                    # noqa: E402
+    ComparisonRunResponseSchema, ErrorResponseSchema,
+)
 
-comparison_bp = Blueprint("comparison", __name__)
+comparison_bp = Blueprint(
+    "comparison", __name__,
+    description="Side-by-side comparison of two assets over the same period.",
+)
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = os.path.join(_ROOT, "data")
@@ -29,6 +36,60 @@ _REQUIRED_CONFIG = {"symbol", "name", "asset_type", "currency", "period", "inter
 
 
 @comparison_bp.post("/run")
+@comparison_bp.response(200, ComparisonRunResponseSchema())
+@comparison_bp.alt_response(400, schema=ErrorResponseSchema(), description="Validation error")
+@comparison_bp.alt_response(429, schema=ErrorResponseSchema(), description="Rate limit exceeded")
+@comparison_bp.alt_response(500, schema=ErrorResponseSchema(), description="Pipeline stage failed")
+@comparison_bp.doc(
+    summary="Run asset comparison pipeline",
+    description=(
+        "Fetches and analyses data for two assets in parallel, then generates "
+        "correlation metrics, cumulative return charts, and a combined PDF report. "
+        "Both assets must share the same `period` and `interval`. "
+        "Results are cached for 1 hour. "
+        "**Rate limit:** 2/min · 5/hr · 15/day."
+    ),
+    requestBody={
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "required": ["config_a", "config_b"],
+                    "properties": {
+                        "config_a": {
+                            "type": "object",
+                            "description": "Config for the first asset",
+                            "required": ["symbol", "name", "asset_type", "currency", "period", "interval"],
+                            "properties": {
+                                "symbol":     {"type": "string", "example": "AAPL"},
+                                "name":       {"type": "string", "example": "Apple Inc."},
+                                "asset_type": {"type": "string", "example": "Stocks"},
+                                "currency":   {"type": "string", "example": "USD"},
+                                "period":     {"type": "string", "example": "1y"},
+                                "interval":   {"type": "string", "example": "1d"},
+                            },
+                        },
+                        "config_b": {
+                            "type": "object",
+                            "description": "Config for the second asset (same period/interval required)",
+                            "required": ["symbol", "name", "asset_type", "currency", "period", "interval"],
+                            "properties": {
+                                "symbol":     {"type": "string", "example": "MSFT"},
+                                "name":       {"type": "string", "example": "Microsoft Corp."},
+                                "asset_type": {"type": "string", "example": "Stocks"},
+                                "currency":   {"type": "string", "example": "USD"},
+                                "period":     {"type": "string", "example": "1y"},
+                                "interval":   {"type": "string", "example": "1d"},
+                            },
+                        },
+                        "bypass_cache": {"type": "boolean", "example": False},
+                    },
+                }
+            }
+        },
+    },
+)
 @limiter.limit("15 per day;5 per hour;2 per minute")
 def run():
     body = request.get_json(silent=True) or {}
@@ -154,7 +215,9 @@ def run():
 
 
 @comparison_bp.get("/pdf/<symbol_a>/<symbol_b>")
+@comparison_bp.alt_response(404, schema=ErrorResponseSchema())
 def view_pdf(symbol_a: str, symbol_b: str):
+    """Serve the comparison PDF inline in the browser."""
     filename = f"{symbol_a}_vs_{symbol_b}_comparison_report.pdf"
     data_dir = Path(_DATA_DIR)
     if not (data_dir / filename).is_file():
@@ -166,7 +229,9 @@ def view_pdf(symbol_a: str, symbol_b: str):
 
 
 @comparison_bp.get("/download/<symbol_a>/<symbol_b>")
+@comparison_bp.alt_response(404, schema=ErrorResponseSchema())
 def download_pdf(symbol_a: str, symbol_b: str):
+    """Download the comparison PDF as an attachment."""
     filename = f"{symbol_a}_vs_{symbol_b}_comparison_report.pdf"
     data_dir = Path(_DATA_DIR)
     if not (data_dir / filename).is_file():

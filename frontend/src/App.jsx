@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, ChevronRight, CalendarCheck, X, GitCompare } from 'lucide-react'
+import { Clock, ChevronRight, CalendarCheck, X, GitCompare, BookOpen } from 'lucide-react'
 import AssetSelector from './components/AssetSelector'
 import Dashboard from './components/Dashboard'
 import ScheduleManager from './components/ScheduleManager'
@@ -317,6 +317,16 @@ export default function App() {
               <Clock size={13} />
               <span className="hidden sm:inline">Previous Runs</span>
             </button>
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="fp-nav-btn"
+              style={{ textDecoration: 'none' }}
+            >
+              <BookOpen size={13} />
+              <span className="hidden sm:inline">API Docs</span>
+            </a>
           </nav>
         </div>
       </header>

@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO
+from flask_smorest import Api
 from dotenv import load_dotenv
 
 from api.assets     import assets_bp
@@ -17,6 +18,7 @@ from api.schedule   import schedule_bp
 from api.comparison import comparison_bp
 from api.cache      import cache_bp
 from extensions     import limiter
+from docs_config    import OPENAPI_CONFIG
 
 load_dotenv()
 
@@ -36,6 +38,7 @@ else:
     logger.info("Development mode — CORS enabled, React served by Vite")
 
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
+app.config.update(OPENAPI_CONFIG)
 
 socketio = SocketIO(
     app,
@@ -49,12 +52,13 @@ socketio = SocketIO(
 
 limiter.init_app(app)
 
-app.register_blueprint(assets_bp,      url_prefix="/api/assets")
-app.register_blueprint(pipeline_bp,    url_prefix="/api/pipeline")
-app.register_blueprint(reports_bp,     url_prefix="/api/reports")
-app.register_blueprint(schedule_bp,    url_prefix="/api/schedule")
-app.register_blueprint(comparison_bp,  url_prefix="/api/comparison")
-app.register_blueprint(cache_bp,       url_prefix="/api/cache")
+api = Api(app)
+api.register_blueprint(assets_bp,      url_prefix="/api/assets")
+api.register_blueprint(pipeline_bp,    url_prefix="/api/pipeline")
+api.register_blueprint(reports_bp,     url_prefix="/api/reports")
+api.register_blueprint(schedule_bp,    url_prefix="/api/schedule")
+api.register_blueprint(comparison_bp,  url_prefix="/api/comparison")
+api.register_blueprint(cache_bp,       url_prefix="/api/cache")
 
 
 @app.errorhandler(429)

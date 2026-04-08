@@ -5,7 +5,8 @@ import re
 import sys
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request
+from flask import jsonify, request
+from flask_smorest import Blueprint
 
 # Root pipeline modules use CWD-relative paths (e.g. data/raw/).
 # Flask must be started from the project root for those paths to resolve.
@@ -25,8 +26,14 @@ from charts import generate_charts
 from report import generate_report
 from scheduler import _send_email  # reuse the shared email helper
 from extensions import limiter
+from schemas import (
+    PipelineRunResponseSchema, PipelineStatusResponseSchema, ErrorResponseSchema,
+)
 
-pipeline_bp = Blueprint("pipeline", __name__)
+pipeline_bp = Blueprint(
+    "pipeline", __name__,
+    description="Run the full financial analysis pipeline for a single asset.",
+)
 logger = logging.getLogger(__name__)
 
 _REQUIRED_FIELDS  = {"symbol", "name", "asset_type", "currency", "period", "interval"}
@@ -60,6 +67,47 @@ def _chart_urls(paths: list, symbol: str) -> list:
 
 
 @pipeline_bp.post("/run")
+@pipeline_bp.response(200, PipelineRunResponseSchema())
+@pipeline_bp.alt_response(400, schema=ErrorResponseSchema(), description="Validation error")
+@pipeline_bp.alt_response(429, schema=ErrorResponseSchema(), description="Rate limit exceeded")
+@pipeline_bp.alt_response(500, schema=ErrorResponseSchema(), description="Pipeline stage failed")
+@pipeline_bp.doc(
+    summary="Run financial analysis pipeline",
+    description=(
+        "Fetches market data from Yahoo Finance, cleans it, runs statistical analysis, "
+        "generates charts, and builds a PDF report. "
+        "Results are cached for 1 hour — pass `bypass_cache: true` or the "
+        "`X-Cache-Bypass: true` header to force a fresh run. "
+        "**Rate limit:** 3/min · 10/hr · 30/day."
+    ),
+    requestBody={
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "required": ["symbol", "name", "asset_type", "currency", "period", "interval"],
+                    "properties": {
+                        "symbol":       {"type": "string",  "example": "AAPL"},
+                        "name":         {"type": "string",  "example": "Apple Inc."},
+                        "asset_type":   {"type": "string",  "example": "Stocks"},
+                        "currency":     {"type": "string",  "example": "USD"},
+                        "period":       {"type": "string",  "example": "1y",
+                                         "description": "Use 'custom' to supply start_date/end_date."},
+                        "interval":     {"type": "string",  "example": "1d"},
+                        "start_date":   {"type": "string",  "example": "2023-01-01",
+                                         "description": "Required when period='custom'."},
+                        "end_date":     {"type": "string",  "example": "2024-01-01",
+                                         "description": "Required when period='custom'."},
+                        "email":        {"type": "string",  "example": "user@example.com",
+                                         "description": "If provided, the PDF is emailed instead of cached."},
+                        "bypass_cache": {"type": "boolean", "example": False},
+                    },
+                }
+            }
+        },
+    },
+)
 @limiter.limit("30 per day;10 per hour;3 per minute")
 def run_pipeline():
     body = request.get_json(silent=True) or {}
@@ -260,9 +308,12 @@ def run_pipeline():
 
 
 @pipeline_bp.get("/status")
+@pipeline_bp.response(200, PipelineStatusResponseSchema())
+@pipeline_bp.alt_response(500, schema=ErrorResponseSchema())
 def status():
+    """List all assets that have been processed by the pipeline."""
     try:
-        init_db()  # ensure tables exist even before any pipeline run
+        init_db()
         df = list_assets()
         cols = ["symbol", "name", "asset_type", "run_at", "row_count"]
         present = [c for c in cols if c in df.columns]

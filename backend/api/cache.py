@@ -3,7 +3,8 @@ import os
 import sys
 import time
 
-from flask import Blueprint, jsonify, request
+from flask import jsonify, request
+from flask_smorest import Blueprint
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
@@ -14,8 +15,15 @@ from db import (  # noqa: E402
     delete_cached_report, _make_cache_key,
 )
 from extensions import limiter  # noqa: E402
+from schemas import (           # noqa: E402
+    CacheStatusResponseSchema, CachePurgeResponseSchema,
+    CacheInvalidateResponseSchema, ErrorResponseSchema,
+)
 
-cache_bp = Blueprint("cache", __name__)
+cache_bp = Blueprint(
+    "cache", __name__,
+    description="Inspect active cache entries and manage cache invalidation.",
+)
 logger = logging.getLogger(__name__)
 
 _ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
@@ -31,9 +39,10 @@ def _check_admin() -> bool:
 # ── GET /api/cache/status ─────────────────────────────────────────────────────
 
 @cache_bp.get("/status")
+@cache_bp.response(200, CacheStatusResponseSchema())
 @limiter.exempt
 def status():
-    """Return all active cache entries with time-until-expiry."""
+    """Return all active (non-expired) cache entries with time-until-expiry."""
     now = time.time()
     entries = list_cache_entries()
     result = []
@@ -55,8 +64,13 @@ def status():
 # ── DELETE /api/cache/purge ───────────────────────────────────────────────────
 
 @cache_bp.delete("/purge")
+@cache_bp.response(200, CachePurgeResponseSchema())
+@cache_bp.alt_response(403, schema=ErrorResponseSchema())
 def purge():
-    """Delete all expired cache entries.  Requires X-Admin-Token."""
+    """Delete all expired cache entries.
+
+    Requires the `X-Admin-Token` header when `ADMIN_TOKEN` env var is set.
+    """
     if not _check_admin():
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -70,11 +84,20 @@ def purge():
 # ── DELETE /api/cache/invalidate ──────────────────────────────────────────────
 
 @cache_bp.delete("/invalidate")
+@cache_bp.response(200, CacheInvalidateResponseSchema())
+@cache_bp.alt_response(400, schema=ErrorResponseSchema())
+@cache_bp.alt_response(403, schema=ErrorResponseSchema())
+@cache_bp.alt_response(500, schema=ErrorResponseSchema())
+@cache_bp.doc(
+    summary="Invalidate a specific cache entry",
+    description=(
+        "Delete the cached report for a specific symbol/period/interval combination. "
+        "Requires the `X-Admin-Token` header when `ADMIN_TOKEN` env var is set. "
+        "Body: `{\"symbol\": \"AAPL\", \"period\": \"1y\", \"interval\": \"1d\"}`."
+    ),
+)
 def invalidate():
-    """Delete a specific cache entry by symbol/period/interval.
-    Body: {"symbol": "AAPL", "period": "1y", "interval": "1d"}
-    Requires X-Admin-Token.
-    """
+    """Delete a specific cache entry by symbol/period/interval."""
     if not _check_admin():
         return jsonify({"error": "Unauthorized"}), 403
 

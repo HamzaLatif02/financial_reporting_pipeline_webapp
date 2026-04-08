@@ -9,6 +9,9 @@ flask-socketio
 eventlet
 Flask-Limiter
 limits
+flask-smorest
+marshmallow
+apispec
 celery
 redis
 gunicorn

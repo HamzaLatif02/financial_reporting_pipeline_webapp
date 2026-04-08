@@ -5,6 +5,8 @@ Uses Render's free PostgreSQL database (DATABASE_URL env var) so jobs
 survive service restarts and redeploys — unlike SQLite on Render's
 ephemeral filesystem which is wiped on every restart.
 """
+from __future__ import annotations
+
 import json
 import logging
 import os

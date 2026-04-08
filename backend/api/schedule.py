@@ -5,7 +5,8 @@ import secrets
 import sys
 import threading
 
-from flask import Blueprint, jsonify, request
+from flask import jsonify, request
+from flask_smorest import Blueprint
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _ROOT not in sys.path:
@@ -17,8 +18,16 @@ from scheduler import (  # noqa: E402
 )
 from pg_jobs import confirm_job, pg_load_confirmed_jobs, pg_load_pending_jobs  # noqa: E402
 from extensions import limiter  # noqa: E402
+from schemas import (          # noqa: E402
+    ScheduleAddResponseSchema, ConfirmResponseSchema, RemoveJobResponseSchema,
+    SendNowResponseSchema, ScheduleListResponseSchema, PendingListResponseSchema,
+    ErrorResponseSchema,
+)
 
-schedule_bp = Blueprint("schedule", __name__)
+schedule_bp = Blueprint(
+    "schedule", __name__,
+    description="Schedule recurring email reports with double opt-in confirmation.",
+)
 logger = logging.getLogger(__name__)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -66,6 +75,51 @@ def _send_confirmation_email(email: str, symbol: str, schedule: dict, confirm_ur
 # ── POST /add ──────────────────────────────────────────────────────────────────
 
 @schedule_bp.post("/add")
+@schedule_bp.response(200, ScheduleAddResponseSchema())
+@schedule_bp.alt_response(400, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(429, schema=ErrorResponseSchema(), description="Rate limit exceeded")
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
+@schedule_bp.doc(
+    summary="Schedule a recurring report",
+    description=(
+        "Creates a pending scheduled job and sends a double opt-in confirmation email. "
+        "The job is not activated until the user clicks the confirmation link. "
+        "**Rate limit:** 5/hr · 20/day."
+    ),
+    requestBody={
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "type": "object",
+                    "required": ["email", "frequency", "config"],
+                    "properties": {
+                        "email":       {"type": "string", "example": "user@example.com"},
+                        "frequency":   {"type": "string", "enum": ["daily", "weekly", "monthly"]},
+                        "hour":        {"type": "integer", "example": 8},
+                        "minute":      {"type": "integer", "example": 0},
+                        "day_of_week": {"type": "string",  "example": "mon",
+                                        "description": "Required for weekly frequency."},
+                        "day":         {"type": "integer", "example": 1,
+                                        "description": "Day of month. Required for monthly frequency."},
+                        "config": {
+                            "type": "object",
+                            "required": ["symbol", "name", "asset_type", "currency", "period", "interval"],
+                            "properties": {
+                                "symbol":     {"type": "string", "example": "AAPL"},
+                                "name":       {"type": "string", "example": "Apple Inc."},
+                                "asset_type": {"type": "string", "example": "Stocks"},
+                                "currency":   {"type": "string", "example": "USD"},
+                                "period":     {"type": "string", "example": "1y"},
+                                "interval":   {"type": "string", "example": "1d"},
+                            },
+                        },
+                    },
+                }
+            }
+        },
+    },
+)
 @limiter.limit("20 per day;5 per hour")
 def add():
     body = request.get_json(silent=True) or {}
@@ -130,7 +184,14 @@ def add():
 # ── GET /confirm ───────────────────────────────────────────────────────────────
 
 @schedule_bp.get("/confirm")
+@schedule_bp.response(200, ConfirmResponseSchema())
+@schedule_bp.alt_response(400, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
 def confirm():
+    """Activate a pending scheduled job via its confirmation token.
+
+    Query parameter: `ct` — the confirmation token from the email link.
+    """
     ct = request.args.get("ct", "").strip()
     if not ct:
         return jsonify({"error": "Missing confirmation token."}), 400
@@ -163,7 +224,15 @@ def confirm():
 # ── DELETE /remove/<job_id> ────────────────────────────────────────────────────
 
 @schedule_bp.delete("/remove/<job_id>")
+@schedule_bp.response(200, RemoveJobResponseSchema())
+@schedule_bp.alt_response(403, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(404, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
 def remove(job_id: str):
+    """Cancel and remove a scheduled job.
+
+    Requires the `X-Schedule-Token` header containing the token returned when the job was created.
+    """
     client_tokens = _parse_token_header()
 
     stored_token = get_stored_token(job_id)
@@ -187,6 +256,20 @@ def remove(job_id: str):
 # ── POST /send-now/<job_id> ────────────────────────────────────────────────────
 
 @schedule_bp.post("/send-now/<job_id>")
+@schedule_bp.response(200, SendNowResponseSchema())
+@schedule_bp.alt_response(400, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(403, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(404, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(429, schema=ErrorResponseSchema(), description="Rate limit exceeded")
+@schedule_bp.doc(
+    summary="Trigger an immediate report send",
+    description=(
+        "Generates and emails the report for the given job right now, "
+        "outside of the regular schedule. "
+        "Requires the `X-Schedule-Token` header. "
+        "**Rate limit:** 3/hr · 10/day."
+    ),
+)
 @limiter.limit("10 per day;3 per hour")
 def send_now(job_id: str):
     client_tokens = _parse_token_header()
@@ -228,7 +311,14 @@ def send_now(job_id: str):
 # ── GET /list ──────────────────────────────────────────────────────────────────
 
 @schedule_bp.get("/list")
+@schedule_bp.response(200, ScheduleListResponseSchema())
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
 def list_all():
+    """List all confirmed scheduled jobs owned by the caller.
+
+    Pass one or more job tokens in `X-Schedule-Token` (comma-separated).
+    Only jobs whose token matches are returned.
+    """
     client_tokens = _parse_token_header()
     if not client_tokens:
         return jsonify({"jobs": []})
@@ -258,7 +348,13 @@ def list_all():
 # ── GET /pending ───────────────────────────────────────────────────────────────
 
 @schedule_bp.get("/pending")
+@schedule_bp.response(200, PendingListResponseSchema())
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
 def list_pending():
+    """List pending (unconfirmed) scheduled jobs owned by the caller.
+
+    Pass one or more job tokens in `X-Schedule-Token` (comma-separated).
+    """
     client_tokens = _parse_token_header()
     if not client_tokens:
         return jsonify({"jobs": []})
@@ -289,7 +385,16 @@ def list_pending():
 # ── POST /resend-confirmation ──────────────────────────────────────────────────
 
 @schedule_bp.post("/resend-confirmation")
+@schedule_bp.response(200, ErrorResponseSchema())
+@schedule_bp.alt_response(400, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(403, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(404, schema=ErrorResponseSchema())
+@schedule_bp.alt_response(500, schema=ErrorResponseSchema())
 def resend_confirmation():
+    """Resend the opt-in confirmation email for a pending job.
+
+    Requires `X-Schedule-Token` header. Body: `{"job_id": "..."}`.
+    """
     client_tokens = _parse_token_header()
 
     body   = request.get_json(silent=True) or {}
