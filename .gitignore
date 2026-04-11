@@ -17,3 +17,6 @@ __pycache__/
 backend/__pycache__/
 backend/data/
 ENV_VARS.md
+.coverage
+.gitignore
+coverage.xml
